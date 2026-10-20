@@ -1,0 +1,36 @@
+{
+  "id": "tutorial-recording",
+  "name": "Tutorial · Screen recording",
+  "category": "Tutorial",
+  "tagline": "Your screen recording in a glossy white frame with step rails, caption pill and speed badges for repeats.",
+  "example": {
+    "composition": "DnsSetupTutorial",
+    "t": 40
+  },
+  "defaults": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "language": "English",
+    "captions": "step pill",
+    "brand": "magicbolt"
+  },
+  "asks": [
+    "screen recording (mp4)",
+    "list of steps with where they happen in the recording",
+    "voiceover (optional)"
+  ],
+  "reuse": [
+    "src/tutorial/brand.tsx",
+    "src/dns/ui.tsx",
+    "src/dns/config.ts",
+    "src/dns/DnsTutorial.tsx"
+  ],
+  "recipe": [
+    "TitleCard opening and EndLogo ending from src/tutorial/brand.tsx, exactly as the animated tutorial.",
+    "Middle: the recording (OffthreadVideo) in a glossy white frame on the soft Backdrop, glossy icon RailItems at the sides showing step progress (upcoming / active / done), Caption pill at the bottom.",
+    "Cut the source with src-in/src-out times per segment (dns/config.ts pattern: all src* times are seconds in the SOURCE, durations are output seconds, speeds per segment). First pass of a repeated task at 1x, repeats sped up with a speed badge.",
+    "Blur private details (account e-mails, keys) with a blurred box over that region.",
+    "Look at the recording first (frames are extracted into the project refs folder) to find the cut points; if it is blurry or confusing, suggest the animated tutorial preset instead (the user preferred it)."
+  ]
+}

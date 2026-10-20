@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MagicBolt Video Studio</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231354BC'/%3E%3Cpath d='M36 6 14 36h14l-4 22 22-30H32z' fill='%23FDC60B'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/">
+      <span class="bolt"><svg viewBox="0 0 64 64"><path d="M36 6 14 36h14l-4 22 22-30H32z" /></svg></span>
+      <span>Video Studio</span>
+    </a>
+    <div class="top-mid" id="crumbs"></div>
+    <div class="top-right">
+      <span class="pill" id="render-pill" hidden></span>
+      <a class="btn ghost sm" id="open-remotion" target="_blank" rel="noopener">Remotion Studio ↗</a>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="side">
+      <button class="btn primary block" data-action="home">＋ New video</button>
+      <div class="side-label">Projects</div>
+      <nav id="projects"></nav>
+    </aside>
+    <main id="main"></main>
+    <section class="chat" id="chat" hidden>
+      <div class="chat-head">
+        <div><b>Claude</b> <span id="agent-state" class="muted">idle</span></div>
+        <button class="btn ghost sm" id="stop-btn" data-action="stop" hidden>■ Stop</button>
+      </div>
+      <div class="chat-log" id="chat-log"></div>
+      <form class="chat-input" id="chat-form">
+        <textarea id="chat-text" rows="3" placeholder="Tell Claude what to change… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <button class="btn primary" type="submit">Send</button>
+      </form>
+    </section>
+  </div>
+  <div class="lightbox" id="lightbox" hidden><img alt="" /><div class="lb-cap"></div></div>
+  <div class="toast" id="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

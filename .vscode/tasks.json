@@ -1,0 +1,15 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Video Studio",
+      "detail": "Starts MagicBolt Video Studio and opens it in the browser",
+      "type": "shell",
+      "command": "node studio/server/index.mjs",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {"reveal": "silent", "panel": "dedicated"},
+      "runOptions": {"runOn": "folderOpen"}
+    }
+  ]
+}

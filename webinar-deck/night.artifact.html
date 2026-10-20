@@ -1,0 +1,21 @@
+<title>MagicBolt City Lights Deck</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="night.css">
+<style>html, body { height: 100%; background: #060A18; }</style>
+<div id="aurora"><i></i><i></i><i></i><i></i></div>
+<div id="night"></div>
+<canvas id="bg"></canvas>
+<div id="stage"></div>
+
+<div id="bar"><i></i></div>
+<button id="prev" class="nav" title="Previous (Left arrow)" aria-label="Previous slide"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+<button id="next" class="nav" title="Next (Right arrow)" aria-label="Next slide"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+<button id="fs" class="corner" title="Full screen (F)" aria-label="Toggle full screen">
+  <svg class="enter" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+  <svg class="exit" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+</button>
+<button id="restart" class="corner" title="Back to first slide (Home)" aria-label="Restart from first slide"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4v4.5h4.5"/></svg></button>
+<button id="count" title="All slides (G)">1 / 1</button>
+<div id="ov"></div>
+
+<script src="night.js"></script>

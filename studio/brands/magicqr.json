@@ -1,0 +1,16 @@
+{
+  "id": "magicqr",
+  "name": "Magic QR",
+  "palette": {"purple": "#4F429A", "pink": "#ED1C6F", "yellow": "#FDBA17", "ink": "#1B1640", "slate": "#6B6788", "line": "#E4E0F3"},
+  "logo": "magicqr-logo.png",
+  "fonts": ["Poppins (body)", "DM Serif Display (headlines, public/fonts/DMSerifDisplay-Regular.ttf)"],
+  "site": "www.magicbolt.ai",
+  "email": "contact@magicbolt.ai",
+  "assets": ["magicqr-standee.webp", "Glossy QR Code Five-Star Display.png", "Vibrant QR Restaurant Menu Scene.png"],
+  "rules": [
+    "Bright glossy look on a soft white/lilac/pink wash with drifting sparkles (qr/kit Sky).",
+    "Purple, pink and yellow brand colours; Google-style UI colours for review screens.",
+    "Demo businesses are placeholders (e.g. SUNRISE CAFE, MP Nagar, Bhopal), never real listings.",
+    "Powered by MagicBolt AI at the end; prices in INR."
+  ]
+}

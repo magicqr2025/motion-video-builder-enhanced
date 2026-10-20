@@ -1,0 +1,36 @@
+{
+  "id": "webinar-3d",
+  "name": "Promo · 3D city webinar",
+  "category": "Reel 9:16",
+  "tagline": "Bright glossy promo with a three.js 3D city fly-through, swipes, bursts and rays. For events and webinars.",
+  "example": {
+    "composition": "AIAgencyWebinar",
+    "t": 6
+  },
+  "defaults": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "language": "Hinglish",
+    "captions": "off",
+    "brand": "magicbolt"
+  },
+  "asks": [
+    "event name, date, time",
+    "voiceover (mp3)",
+    "registration link / CTA"
+  ],
+  "reuse": [
+    "src/webinar/WebinarReel.tsx",
+    "src/webinar/config.ts",
+    "src/webinar/kit.tsx",
+    "src/webinar/city.tsx",
+    "src/webinar/cam.ts",
+    "src/webinar/ScenesCity.tsx"
+  ],
+  "recipe": [
+    "A @remotion/three city scene with a scripted camera path (cam.ts); 2D overlays anchored to 3D points (Anchor).",
+    "Big gradient headlines with halo, Gloss buttons, Burst / Rays / Swipe / FlashW transitions, Seg sub-sequences.",
+    "Rendering needs the angle GL renderer (already in remotion.config.ts and the studio renderer)."
+  ]
+}

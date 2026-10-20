@@ -1,0 +1,34 @@
+{
+  "id": "neon-reel",
+  "name": "Reel · Dark neon",
+  "category": "Reel 9:16",
+  "tagline": "Dark glass + neon accents, condensed type, shutter cuts and screen shakes. High-energy agency style.",
+  "example": {
+    "composition": "AgencyOSReelNeon",
+    "t": 6
+  },
+  "defaults": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "language": "Hinglish",
+    "captions": "kinetic",
+    "brand": "custom"
+  },
+  "asks": [
+    "voiceover (mp3)",
+    "key claims"
+  ],
+  "reuse": [
+    "src/neon/NeonReel.tsx",
+    "src/neon/config.ts",
+    "src/neon/kit.tsx",
+    "src/neon/objects.tsx"
+  ],
+  "recipe": [
+    "Palette: bg #07080E, cards #0F111B, text #F4F6FF, accents cyan #19D3F3, lime #C8FF3D, pink #FF4D8D.",
+    "Type: Anton headlines (H), Space Grotesk body (B), JetBrains Mono tags (M). Kin = kinetic staggered words.",
+    "Glass cards with glow, Tag chips, Shutter transitions, Shake on impact cues, Flash bursts.",
+    "For MagicBolt-branded work the user prefers Poppins over Anton; use this look only when they ask for dark neon."
+  ]
+}

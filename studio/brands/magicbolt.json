@@ -1,0 +1,25 @@
+{
+  "id": "magicbolt",
+  "name": "MagicBolt AI",
+  "palette": {"navy": "#0E1B4D", "deep": "#1354BC", "blue": "#1582D5", "gold": "#FDC60B", "orange": "#F7941D", "slate": "#5A6488"},
+  "logo": "magicbolt-logo.png",
+  "logoAnimation": "src/logo/LogoAnim.tsx (composition LogoAnim)",
+  "endVideo": "logo-animation.mp4",
+  "fonts": ["Poppins (public/fonts/Poppins-Regular.ttf, Poppins-Bold.ttf)"],
+  "site": "www.magicbolt.ai",
+  "email": "contact@magicbolt.ai",
+  "assets": [
+    "AI Robot Recommends a Local Shop.png", "Glossy QR Code Five-Star Display.png", "Glossy Social Link Hub Illustration.png",
+    "Glossy Social Media Planner Scene.png", "Glossy WhatsApp Broadcast Network.png", "Interactive QR Contact Card Illustration.png",
+    "Playful Local Business Growth Dashboard.png", "Vibrant QR Restaurant Menu Scene.png"
+  ],
+  "rules": [
+    "Glossy 3D icons and illustrated characters, never flat emoji or plain flat SVG avatars.",
+    "Bold, large Poppins type (title case, ExtraBold/Bold). Never condensed all-caps Anton for MagicBolt.",
+    "Background motion stays subtle and semi-transparent so it never competes with the content.",
+    "Lots of animation on every element; use the logo build animation (LogoAnim) for brand moments.",
+    "Reuse real assets from public/ (illustrations above, magicbolt-logo.png).",
+    "Website is www.magicbolt.ai (not .in), contact contact@magicbolt.ai. Prices in INR.",
+    "Short copy: one or two lines per item."
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "_help": {
+    "Inbox.title": "feature name, max ~16 chars",
+    "Inbox.sub": "max ~28 chars",
+    "Leads": "demo names only, max ~16 chars each; source = channel shown after 'via'",
+    "Tags": "one short word each",
+    "DropBox": "concept B pop-up lines, max ~12 chars",
+    "PhoneApp": "concept C app texts"
+  },
+  "Inbox": {
+    "title": "Lead Center",
+    "sub": "All leads, one inbox"
+  },
+  "Sources": {
+    "whatsapp": "WhatsApp",
+    "website": "Website",
+    "google": "Google"
+  },
+  "Leads": [
+    {
+      "name": "Priya Nair",
+      "source": "WhatsApp"
+    },
+    {
+      "name": "Arjun Mehta",
+      "source": "Website"
+    },
+    {
+      "name": "Sana Khan",
+      "source": "Google"
+    }
+  ],
+  "Common": {
+    "via": "via"
+  },
+  "Tags": {
+    "hot": "Hot",
+    "warm": "Warm"
+  },
+  "DropBox": {
+    "hotPop": "Hot lead!",
+    "warmPop": "Warm lead"
+  },
+  "PhoneApp": {
+    "filters": [
+      "All",
+      "Hot",
+      "Warm"
+    ],
+    "notify": "New lead",
+    "time": "just now"
+  }
+}

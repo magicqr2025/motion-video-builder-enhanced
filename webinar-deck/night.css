@@ -1,0 +1,114 @@
+/* "City Lights" theme. Loaded after style.css and scoped to .night, which night.js sets on <html>.
+   Layout: content left on a dark sky, a figure made of points of light to the right, a ghost slide number bottom right. */
+@font-face { font-family: Unbounded; src: url(assets/fonts/Unbounded.ttf); font-weight: 200 900; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url(assets/fonts/PlusJakartaSans.ttf); font-weight: 200 800; }
+@font-face { font-family: "JetBrains Mono"; src: url(assets/fonts/JetBrainsMono.ttf); font-weight: 100 800; }
+
+:root.night {
+  color-scheme: dark;
+  --sky: #060A18; --navy: #060A18; --ink: #EEF3FF; --soft: #9AA7CE;
+  --blue: #35C8FF; --deep: #2B6BFF; --gold: #FFC83D; --orange: #FF8A2B;
+  --pink: #FF5CA8; --purple: #9B7BFF; --green: #3DE0A6;
+  --glass: rgba(13, 21, 48, .74); --line: rgba(255, 255, 255, .14);
+  --display: Unbounded, "Trebuchet MS", sans-serif;
+  --text: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", Consolas, monospace;
+}
+.night body { background: var(--sky); color: var(--ink); font-family: var(--text); }
+.night #aurora i { opacity: .13; }
+.night #night { opacity: 1; background: radial-gradient(110% 80% at 70% 40%, #12235C 0%, #0A1232 45%, var(--sky) 100%); }
+.night #bg, .night body.dark #bg { opacity: .85; }
+
+/* ---------- type ---------- */
+.night h1 { font-family: var(--display); font-weight: 400; font-size: 70px; line-height: 1.2; letter-spacing: -1.5px; max-width: 1400px; text-wrap: balance; }
+.night h1.xl { font-size: 84px; letter-spacing: -2px; }
+.night .slide.dark .g, .night .g { background-image: linear-gradient(90deg, var(--gold), var(--orange), var(--pink), var(--gold)); filter: drop-shadow(0 0 22px rgba(255, 138, 43, .45)); }
+.night .slide.dark .g2, .night .g2 { background-image: linear-gradient(90deg, var(--blue), var(--purple), var(--blue)); filter: drop-shadow(0 0 22px rgba(53, 200, 255, .45)); }
+.night .slide.dark .kicker {
+  background: none; border: 0; box-shadow: none; padding: 0; margin-bottom: 26px;
+  font-family: var(--mono); font-weight: 500; font-size: 22px; letter-spacing: 5px; color: var(--blue);
+}
+.night .slide.dark .kicker::before { width: 12px; height: 12px; background: var(--blue); box-shadow: 0 0 16px var(--blue); }
+.night .slide.dark p.lead { color: var(--soft); font-weight: 400; font-size: 36px; }
+.night p.note { color: var(--soft); font-family: var(--mono); font-size: 20px; }
+.night .slide.dark b { color: #fff; }
+
+/* ghost slide number */
+.night .slide::before {
+  content: attr(data-n); position: absolute; right: 120px; bottom: 54px; z-index: -1;
+  font-family: var(--display); font-weight: 300; font-size: 250px; line-height: 1; letter-spacing: -8px;
+  color: transparent; -webkit-text-stroke: 1.5px rgba(255, 255, 255, .09);
+}
+
+/* ---------- surfaces ---------- */
+.night .slide.dark .tile, .night .tile {
+  background: var(--glass); border: 1px solid var(--line); border-radius: 26px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, .35), 0 0 0 1px color-mix(in srgb, var(--c, var(--blue)) 10%, transparent) inset;
+}
+.night .tile::after { left: 0; right: 0; top: 0; bottom: auto; height: 2px; border-radius: 26px 26px 0 0; background: linear-gradient(90deg, transparent, var(--c), transparent); }
+.night .tile h3 { font-weight: 500; }
+.night .slide.dark .tile p { color: var(--soft); }
+.night .tile li::before { background: none; border: 1.5px solid var(--c); color: var(--c); font-weight: 600; }
+.night .badge3d {
+  border-radius: 50%; background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--c) 42%, transparent), rgba(255, 255, 255, .04) 70%);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); box-shadow: 0 0 38px color-mix(in srgb, var(--c) 40%, transparent);
+}
+.night .tile.sm .badge3d { border-radius: 50%; }
+.night .num { font-family: var(--display); font-weight: 300; font-size: 56px; background: none; -webkit-text-stroke: 1.5px var(--c); color: transparent; }
+.night .chip, .night .slide.dark .chip:not(.fill) { background: var(--glass); border: 1px solid color-mix(in srgb, var(--c, var(--blue)) 70%, transparent); color: var(--ink); font-weight: 500; box-shadow: 0 0 22px color-mix(in srgb, var(--c, var(--blue)) 22%, transparent); }
+.night .chip.fill { background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 55%, #000)); color: #fff; }
+.night .row { background: var(--glass); border: 1px solid var(--line); border-left: 3px solid var(--c); border-radius: 22px; color: var(--ink); font-weight: 500; box-shadow: 0 20px 50px rgba(0, 0, 0, .3); }
+.night .table > div { background: var(--glass); border: 1px solid var(--line); color: var(--ink); box-shadow: none; border-radius: 18px; }
+.night .table .th { background: linear-gradient(135deg, color-mix(in srgb, var(--c) 80%, #000), color-mix(in srgb, var(--c) 35%, #000)); border-color: color-mix(in srgb, var(--c) 60%, transparent); font-family: var(--mono); letter-spacing: 2px; text-transform: uppercase; font-size: 24px; }
+.night .table .td { font-family: var(--display); font-weight: 400; font-size: 32px; }
+.night .table .blank { background: none; border: 0; }
+.night .bar .cap { background: var(--glass); border: 1px solid var(--line); color: var(--ink); box-shadow: none; }
+.night .bar .col { background: linear-gradient(180deg, var(--c), color-mix(in srgb, var(--c) 18%, transparent)); box-shadow: 0 0 50px color-mix(in srgb, var(--c) 45%, transparent); }
+.night .bar .amt, .night .now, .night .mega, .night .stat, .night .quote { font-family: var(--display); font-weight: 400; }
+.night .bar .amt { font-size: 54px; }
+.night .now { font-size: 54px; letter-spacing: -2px; }
+.night .now small { color: var(--soft); font-family: var(--mono); font-size: 19px; }
+.night .stat { font-size: 130px; letter-spacing: -4px; }
+.night .mega { font-size: 190px; letter-spacing: -8px; }
+.night .quote { font-size: 124px; letter-spacing: -4px; }
+.night .stat-label, .night .slide.dark .was { color: var(--soft); }
+.night .eq .op { font-family: var(--display); font-weight: 300; color: var(--blue); text-shadow: 0 0 24px var(--blue); }
+.night .timeline::before { background: rgba(255, 255, 255, .12); }
+.night .timeline .dot { border-color: var(--sky); box-shadow: 0 0 24px var(--c); }
+.night .face { background: radial-gradient(circle at 32% 26%, color-mix(in srgb, var(--c) 50%, transparent), rgba(255, 255, 255, .05) 72%); box-shadow: 0 0 60px color-mix(in srgb, var(--c) 40%, transparent); }
+.night .tag { background: none; border: 1px solid var(--c); color: var(--c); font-family: var(--mono); font-weight: 500; font-size: 19px; letter-spacing: 2px; }
+.night .no { color: var(--ink); font-weight: 500; }
+.night .pic.framed { border: 1px solid var(--line); box-shadow: 0 0 80px rgba(53, 200, 255, .25); border-radius: 30px; }
+.night .phone { border-color: #16224F; box-shadow: 0 0 90px rgba(53, 200, 255, .35), 0 0 0 1px var(--line); }
+.night .orbit .halo { border-color: rgba(53, 200, 255, .4); }
+.night .badge { box-shadow: 0 0 44px rgba(255, 200, 61, .55); font-weight: 600; }
+.night .ind img { box-shadow: 0 0 0 1px var(--line), 0 0 40px color-mix(in srgb, var(--c) 35%, transparent); }
+/* the logo is drawn in dark blue, so it sits on a white plate */
+.night .slide.dark .corner-logo { border-radius: 14px; }
+.night .lg { background: #fff; border-radius: 4px; box-shadow: 0 0 0 26px #fff, 0 0 90px 30px rgba(53, 200, 255, .3); margin: 26px; }
+.night .lg .glow { display: none; }
+
+/* ---------- motion: content slides in from the right with a soft focus pull; cards tip up into place ---------- */
+.night .slide { transition: opacity .6s ease, transform .8s cubic-bezier(.2, .8, .2, 1), visibility 0s .6s; transform: scale(1.04); }
+.night .slide.active { transform: none; transition: opacity .6s ease, transform .8s cubic-bezier(.2, .8, .2, 1); }
+.night .slide.active .a { animation-name: nightIn; animation-duration: .9s; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+.night .slide.active .tile.a, .night .slide.active .row.a { animation-name: nightTip, floaty; animation-duration: .9s, 6s; animation-timing-function: cubic-bezier(.2, .8, .2, 1), ease-in-out; }
+.night .slide.active .a.grow { animation-name: grow; }
+.night .slide.active .w { animation-name: nightWord; }
+.night .slide.active .w.g, .night .slide.active .w.g2 { animation-name: nightWord, shine; }
+@keyframes nightIn { from { opacity: 0; transform: translateX(70px); filter: blur(14px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes nightTip { from { opacity: 0; transform: perspective(900px) rotateX(38deg) translateY(70px); } to { opacity: 1; transform: none; } }
+@keyframes nightWord { from { opacity: 0; transform: translateY(.6em); letter-spacing: .12em; } to { opacity: 1; transform: none; } }
+
+/* ---------- controls ---------- */
+.night .nav { background: rgba(13, 21, 48, .8); color: var(--blue); border: 1px solid var(--line); }
+.night .nav:hover { background: var(--blue); color: var(--sky); }
+.night .corner { background: rgba(13, 21, 48, .8); border: 1px solid var(--line); color: var(--blue); }
+.night .corner:hover { background: var(--blue); color: var(--sky); }
+.night #count { background: rgba(13, 21, 48, .8); color: var(--ink); border: 1px solid var(--line); font-family: var(--mono); }
+.night #bar { background: rgba(255, 255, 255, .08); }
+.night #bar i { background: linear-gradient(90deg, var(--blue), var(--purple), var(--pink), var(--gold)); box-shadow: 0 0 14px var(--blue); }
+
+@media (prefers-reduced-motion: reduce) {
+  .night .slide, .night .slide.active { transform: none; transition: opacity .3s; }
+}

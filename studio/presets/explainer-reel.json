@@ -1,0 +1,39 @@
+{
+  "id": "explainer-reel",
+  "name": "Reel · How it works (glossy)",
+  "category": "Reel 9:16",
+  "tagline": "Bright glossy 9:16 explainer with word-by-word caption pill, iris transitions and a sparkle sky. Hinglish voiceover friendly.",
+  "example": {
+    "composition": "MagicQRReview",
+    "t": 14
+  },
+  "defaults": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "language": "Hinglish",
+    "captions": "word-by-word pill",
+    "brand": "magicqr"
+  },
+  "asks": [
+    "voiceover (mp3)",
+    "product + steps to explain",
+    "demo business details"
+  ],
+  "reuse": [
+    "src/qr/QrReel.tsx",
+    "src/qr/config.ts",
+    "src/qr/kit.tsx",
+    "src/qr/captions.tsx",
+    "src/qr/objects.tsx",
+    "src/components/kit.tsx"
+  ],
+  "recipe": [
+    "Structure (QrReel pattern): hook question -> why -> product title -> numbered steps (Stepper) -> result -> who it is for -> product -> close/CTA.",
+    "One config.ts holds every text and timing: each scene has dur (seconds) and cues in seconds from the scene start; scene starts are the running sum. Each scene comment says where it starts in the voiceover (\"// VO 3.55\").",
+    "Shot wrapper per scene with Iris colour-bloom transitions at cuts (brand colours rotate), Sky backdrop with drifting sparkles, TimeCtx for scene-local time.",
+    "Captions: word-timed lines in captions.tsx built from the whisper transcript; one line at a time in a white pill, the spoken word highlighted yellow. Captions run on audio time (outside the Shots).",
+    "Headlines in DM Serif Display, body Poppins. Real standee photo / phone mockups with glossy cards, stars, taps, twinkles.",
+    "Spoken words in Hinglish stay Hinglish on screen; bracket voice directions in a script are never shown."
+  ]
+}

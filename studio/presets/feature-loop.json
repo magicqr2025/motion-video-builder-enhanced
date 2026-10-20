@@ -1,0 +1,34 @@
+{
+  "id": "feature-loop",
+  "name": "Loop · Glossy feature (square)",
+  "category": "Loop / GIF",
+  "tagline": "1200x1200, 4 s seamless loop of one feature: glossy 3D props, floating cards, confetti and glints.",
+  "example": {
+    "composition": "Glow-ReviewBooster",
+    "t": 2
+  },
+  "defaults": {
+    "width": 1200,
+    "height": 1200,
+    "fps": 30,
+    "durationSec": 4,
+    "language": "English",
+    "captions": "none",
+    "brand": "magicbolt"
+  },
+  "asks": [
+    "which feature",
+    "one short label"
+  ],
+  "reuse": [
+    "src/glow/parts.tsx",
+    "src/glow/ScenesA.tsx",
+    "src/glow/index.ts",
+    "src/loops/parts.tsx"
+  ],
+  "recipe": [
+    "useLoop(): p runs 0->1 over the loop; osc() is a sine that always closes the loop; on(a) pops an element in at phase a and away before the restart, so the loop is seamless.",
+    "Stage with a 3-colour gradient, Floor shadow, Chip / Card / Phone / Star3D / Bot / Face / Toast / Msg props, Confetti and Glints.",
+    "One idea per loop, centred, readable at small size."
+  ]
+}

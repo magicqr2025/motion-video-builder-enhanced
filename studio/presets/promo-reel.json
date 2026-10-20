@@ -1,0 +1,36 @@
+{
+  "id": "promo-reel",
+  "name": "Reel · Bold promo / offer",
+  "category": "Reel 9:16",
+  "tagline": "Punchy 9:16 sales reel: hook, pain, versus, product, white-label/offer, CTA. Logo build, glossy pop-ins.",
+  "example": {
+    "composition": "SellSaaSReel",
+    "t": 10
+  },
+  "defaults": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "language": "Hinglish",
+    "captions": "none (big kinetic lines)",
+    "brand": "magicbolt"
+  },
+  "asks": [
+    "voiceover (mp3)",
+    "offer / price (INR)",
+    "CTA"
+  ],
+  "reuse": [
+    "src/saas/SaasReel.tsx",
+    "src/saas/config.ts",
+    "src/saas/kit.tsx",
+    "src/saas/objects.tsx",
+    "src/qr/kit.tsx"
+  ],
+  "recipe": [
+    "Structure (SaasReel pattern): Hook -> swap the old way for the new -> boring vs wow -> versus comparison -> rate/bill -> no-code -> white label -> dashboard -> identity -> offer -> CTA.",
+    "Kinetic Line headlines with a gold marker highlight (MARK), PopIn objects with float, Halo glows, LogoBuild for the brand moment, Gloss on cards.",
+    "Same config.ts timing pattern (dur per scene, cues from scene start, VO comments). Word times from a whisper transcript.",
+    "Use real illustrations from public/ (planner, growth dashboard) and the logo. Prices in INR, site www.magicbolt.ai."
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "id": "comparison-reel",
+  "name": "Reel · Problem vs solution",
+  "category": "Reel 9:16",
+  "tagline": "Contrast reel (e.g. Ads vs Reviews): costly old way, search ranking, factors, then the product flow and a tagline.",
+  "example": {
+    "composition": "MagicQRAdsVsReviews",
+    "t": 8
+  },
+  "defaults": {
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "language": "Hinglish",
+    "captions": "word-by-word pill",
+    "brand": "magicqr"
+  },
+  "asks": [
+    "voiceover (mp3)",
+    "the two sides being compared",
+    "proof points / numbers"
+  ],
+  "reuse": [
+    "src/ads/AdsReel.tsx",
+    "src/ads/config.ts",
+    "src/ads/ScenesA.tsx",
+    "src/ads/ScenesB.tsx",
+    "src/ads/objects.tsx",
+    "src/ads/captions.tsx"
+  ],
+  "recipe": [
+    "Structure: hook (the costly old way) -> free alternative -> search results / ranking -> top 3 -> ranking factors -> ask -> scan -> AI suggests -> one tap -> compare -> order -> tagline.",
+    "Objects: SearchBar with typing caret, Listing cards with rank + stars, Chart that draws, Toggle, Burst, Flame, Pin, Person.",
+    "Captions + timing exactly as the explainer reel (captions on audio time, scenes with dur + local cues)."
+  ]
+}

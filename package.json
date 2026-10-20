@@ -20,7 +20,9 @@
     "typescript": "5.9.3"
   },
   "scripts": {
-    "dev": "remotion studio",
+    "start": "node studio/server/index.mjs",
+    "dev": "node studio/server/index.mjs",
+    "dev:remotion": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc"

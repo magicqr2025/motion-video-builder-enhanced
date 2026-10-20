@@ -1,0 +1,41 @@
+{
+  "id": "tutorial-animated",
+  "name": "Tutorial · Animated screens",
+  "category": "Tutorial",
+  "tagline": "Logo title card, re-created app screens with cursor and fly-chips, caption pill, logo-video ending. Synced to voiceover.",
+  "example": {
+    "composition": "DnsSetupAnimated",
+    "t": 24
+  },
+  "defaults": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "language": "English",
+    "captions": "step pill",
+    "brand": "magicbolt"
+  },
+  "asks": [
+    "script or voiceover",
+    "which screens / steps to show",
+    "demo data to display"
+  ],
+  "reuse": [
+    "src/tutorial/brand.tsx",
+    "src/dns/ui.tsx",
+    "src/dns2/mock.tsx",
+    "src/dns2/config.ts",
+    "src/dns2/DnsAnimated.tsx",
+    "src/logo/LogoAnim.tsx"
+  ],
+  "recipe": [
+    "Opening: TitleCard from src/tutorial/brand.tsx (animated LogoAnim, letter-spaced eyebrow \"MagicBolt Tutorial\", one gradient title, optional sub line). Nothing else on screen. Simple, clear, elegant.",
+    "Middle: fully animated re-creations of the app screens inside the Browser window from src/dns2/mock.tsx, centred at scale 1.06, on the soft Backdrop from src/dns/ui.tsx. No side rails. Only the bottom Caption pill (step badge + short text).",
+    "Interaction: animated Cursor with click keys, FlyChip for copy/paste, Toast for success, Pop/Words for callouts. Typing animates letter by letter.",
+    "Ending: EndLogo (plays public/logo-animation.mp4, 10.04 s, unedited) after the last sentence + 0.6 s.",
+    "Timing: copy the dns2/config.ts pattern. LINES = script, one sentence per entry. VO = measured sentence starts from the voiceover (transcribe it), estimated from word count (~2.5 words/s) until a recording exists. Every cue is F(n, x) = a point x (0-1) through sentence n.",
+    "First pass of a repeated task is slow and explained; repeats are quick passes with the same cue shape.",
+    "Privacy: never real DNS values or real account data; targets show as xxxx.dns.com, demo domain yourbrand.com, \"Your Brand Agency\".",
+    "Deliver a voiceover script (numbered lines + the same as one single-line paragraph) as SCRIPT.md in the project code folder."
+  ]
+}
