@@ -9,8 +9,8 @@ import multer from 'multer';
 import {DATA, WEB, REEL, projectDir, projectAssets, projectCode, compId, conceptsCompId} from './paths.mjs';
 import {listPresets, listBrands, getPreset, listProjects, getProject, saveProject, createProject, deleteProject, readConcepts, readStoryboard, listImages, readLog, appendLog} from './projects.mjs';
 import {runAgent, isBusy, stopAgent} from './agent.mjs';
-import {conceptsPrompt, buildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, textEditedNote} from './prompts.mjs';
-import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, STUDIO_PORT} from './remotion.mjs';
+import {conceptsPrompt, buildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
+import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, writeRegistry, STUDIO_PORT} from './remotion.mjs';
 import {transcribeFile} from './transcribe.mjs';
 import {readSettings, writeSettings, publicSettings, updateAi, aiConfig} from './settings.mjs';
 import {pingModel} from './providers/openai.mjs';
@@ -82,7 +82,7 @@ app.post('/api/projects', wrap(async (req, res) => {
 
 app.get('/api/projects/:id', wrap(async (req, res) => {
   const p = need(req.params.id);
-  res.json({project: p, concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), log: readLog(p.id).slice(-400), busy: isBusy(p.id),
+  res.json({project: p, concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), audio: await fillDurations(p.id), background: readBackground(p.id), style: readStyle(p.id), log: readLog(p.id).slice(-400), busy: isBusy(p.id),
     compositions: {video: compId(p.id), concepts: conceptsCompId(p.id)}, renderJob: renderJob?.projectId === p.id ? renderJob : null});
 }));
 
@@ -149,7 +149,9 @@ const startTurn = (p, prompt, label, {before, after} = {}) => {
   if (before) { Object.assign(p, before); saveProject(p); }
   if (p.briefDirty && !prompt.includes('### Brief')) prompt = `${briefChangedNote(p)}\n\n${prompt}`;
   if (p.textEdited) prompt = `${textEditedNote(p)}\n\n${prompt}`;
-  p.briefDirty = false; p.textEdited = false; saveProject(p);
+  if (p.audioEdited) prompt = `${audioEditedNote(p)}\n\n${prompt}`;
+  if (p.styleEdited) prompt = `${styleEditedNote(p)}\n\n${prompt}`;
+  p.briefDirty = false; p.textEdited = false; p.audioEdited = false; p.styleEdited = false; saveProject(p);
   changed(p.id); broadcast({type: 'projects'});
   runAgent(p.id, prompt, {
     label, emit: broadcast,
@@ -223,6 +225,156 @@ app.post('/api/projects/:id/make-text-editable', wrap(async (req, res) => {
   const p = need(req.params.id);
   startTurn(p, textPrompt(p), 'Make the on-screen text editable in the browser');
   res.json({ok: true});
+}));
+
+// ---------- soundtrack: src/studio/<id>/audio.json (voiceover + music), edited in the Audio tab ----------
+// registry.tsx wraps the project's main composition with <StudioAudio/> whenever this file exists.
+const audioFile = (id) => path.join(projectCode(id), 'audio.json');
+const readAudio = (id) => { try { return JSON.parse(fs.readFileSync(audioFile(id), 'utf8')); } catch { return null; } };
+const TRACK_DEFAULT = {src: null, volume: 1, muted: false, startSec: 0, trimStartSec: 0, trimEndSec: null, durationSec: null};
+const MUSIC_DEFAULT = {...TRACK_DEFAULT, volume: 0.25, loop: true, fadeInSec: 1, fadeOutSec: 2, duck: true, duckLevel: 0.35};
+const clampNum = (v, lo, hi, d) => { const n = Number(v); return v === null || v === '' || !Number.isFinite(n) ? d : Math.min(hi, Math.max(lo, n)); };
+const publicAudio = (src) => {
+  if (typeof src !== 'string' || !src || src.includes('..') || path.isAbsolute(src) || !/\.(mp3|wav|m4a|aac|ogg|mp4|mov|webm)$/i.test(src)) return null;
+  const full = path.join(REEL, 'public', src);
+  return fs.existsSync(full) ? full : null;
+};
+const cleanTrack = async (edit, prev, def) => {
+  const e = edit ?? {};
+  const t = {...def, ...(prev ?? {})};
+  const oldSrc = t.src;
+  if ('src' in e) {
+    if (e.src === null) t.src = null;
+    else if (publicAudio(e.src)) t.src = e.src;
+    else throw Object.assign(new Error(`Audio file not found: ${e.src}`), {status: 400});
+  }
+  t.volume = clampNum(e.volume, 0, 1, t.volume);
+  t.startSec = clampNum(e.startSec, 0, 3600, t.startSec);
+  t.trimStartSec = clampNum(e.trimStartSec, 0, 36000, t.trimStartSec);
+  t.trimEndSec = 'trimEndSec' in e ? clampNum(e.trimEndSec, 0, 36000, null) : t.trimEndSec;
+  if (t.trimEndSec !== null && t.trimEndSec <= t.trimStartSec) t.trimEndSec = null;
+  if ('muted' in e) t.muted = !!e.muted;
+  if ('loop' in def) {
+    t.fadeInSec = clampNum(e.fadeInSec, 0, 60, t.fadeInSec);
+    t.fadeOutSec = clampNum(e.fadeOutSec, 0, 60, t.fadeOutSec);
+    t.duckLevel = clampNum(e.duckLevel, 0, 1, t.duckLevel);
+    if ('loop' in e) t.loop = !!e.loop;
+    if ('duck' in e) t.duck = !!e.duck;
+  }
+  if (!t.src) t.durationSec = null;
+  else if (t.src !== oldSrc || !t.durationSec) {
+    const info = await probe(publicAudio(t.src)).catch(() => null);
+    t.durationSec = info?.duration ? Math.round(info.duration * 100) / 100 : null;
+    if (t.src !== oldSrc) { t.trimStartSec = 'trimStartSec' in e ? t.trimStartSec : 0; t.trimEndSec = 'trimEndSec' in e ? t.trimEndSec : null; }
+  }
+  return t;
+};
+// old files without a length (or hand-edited): measure once and write it back
+const fillDurations = async (id) => {
+  const a = readAudio(id);
+  if (!a || !['voiceover', 'music'].some((k) => a[k]?.src && !a[k].durationSec)) return a;
+  const next = {...a};
+  for (const k of ['voiceover', 'music']) if (a[k]?.src && !a[k].durationSec) next[k] = await cleanTrack({}, a[k], k === 'music' ? MUSIC_DEFAULT : TRACK_DEFAULT);
+  fs.writeFileSync(audioFile(id), JSON.stringify(next, null, 2) + '\n');
+  return next;
+};
+// does the video's own code still play audio itself? (it would double up with audio.json)
+const ownsAudio = (id) => {
+  const walk = (d) => fs.readdirSync(d, {withFileTypes: true}).flatMap((f) => (f.isDirectory() ? walk(path.join(d, f.name)) : /\.tsx?$/.test(f.name) ? [path.join(d, f.name)] : []));
+  try { return walk(projectCode(id)).some((f) => /<(Html5)?Audio[\s>]/.test(fs.readFileSync(f, 'utf8'))); } catch { return false; }
+};
+app.put('/api/projects/:id/audio', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const prev = readAudio(p.id);
+  if (!prev) return res.status(400).json({error: 'This video has no audio.json yet'});
+  const e = req.body.audio ?? {};
+  const next = {voiceover: await cleanTrack(e.voiceover, prev.voiceover, TRACK_DEFAULT), music: await cleanTrack(e.music, prev.music, MUSIC_DEFAULT)};
+  fs.writeFileSync(audioFile(p.id), JSON.stringify(next, null, 2) + '\n');
+  p.audioEdited = true; saveProject(p);
+  appendLog(p.id, {kind: 'system', text: 'You edited the audio mix.'});
+  changed(p.id);
+  res.json(next);
+}));
+app.post('/api/projects/:id/make-audio-editable', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const have = readAudio(p.id);
+  if (have) return res.json({audio: have});
+  if (ownsAudio(p.id)) {
+    startTurn(p, audioPrompt(p), 'Move the audio into audio.json so it is editable in the browser');
+    return res.json({agent: true});
+  }
+  const pick = (role) => p.assets.find((a) => a.role === role && (a.kind === 'audio' || a.kind === 'video'));
+  const vo = pick('voiceover'), mu = pick('music');
+  const audio = {
+    voiceover: await cleanTrack(vo ? {src: `studio/${p.id}/${vo.file}`} : {}, null, TRACK_DEFAULT),
+    music: await cleanTrack(mu ? {src: `studio/${p.id}/${mu.file}`} : {}, null, MUSIC_DEFAULT),
+  };
+  fs.mkdirSync(projectCode(p.id), {recursive: true});
+  fs.writeFileSync(audioFile(p.id), JSON.stringify(audio, null, 2) + '\n');
+  writeRegistry();
+  changed(p.id);
+  res.json({audio});
+}));
+// ---------- animated background objects: a request Claude carries out (a layer in the video's own code) ----------
+app.post('/api/projects/:id/background', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const b = req.body ?? {};
+  const str = (v, n) => String(v ?? '').trim().slice(0, n);
+  const o = {
+    objects: (Array.isArray(b.objects) ? b.objects : []).filter((k) => k in BG_OBJECTS),
+    custom: str(b.custom, 400),
+    placement: b.placement === 'edges' ? 'edges' : 'behind',
+    intensity: ['subtle', 'medium', 'lively'].includes(b.intensity) ? b.intensity : 'subtle',
+    colors: str(b.colors, 120),
+    scenes: str(b.scenes, 160),
+  };
+  if (!o.objects.length && !o.custom) throw Object.assign(new Error('Pick at least one kind of object or describe your own.'), {status: 400});
+  const what = [...o.objects, o.custom].filter(Boolean).join(', ');
+  startTurn(p, backgroundPrompt(p, o), `Add animated background objects (${what}), ${o.intensity}${o.scenes ? `, scenes: ${o.scenes}` : ''}`);
+  res.json({ok: true});
+}));
+// ---------- palette: src/studio/<id>/style.json {colors, _defaults, _labels}, edited from the Style tab ----------
+const styleFile = (id) => path.join(projectCode(id), 'style.json');
+const readStyle = (id) => { try { return JSON.parse(fs.readFileSync(styleFile(id), 'utf8')); } catch { return null; } };
+app.put('/api/projects/:id/style', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const prev = readStyle(p.id);
+  if (!prev) return res.status(400).json({error: 'This video has no style.json yet'});
+  const edit = req.body.colors ?? {};
+  const colors = Object.fromEntries(Object.entries(prev.colors).map(([k, v]) => {
+    const e = req.body.reset ? prev._defaults?.[k] : edit[k];
+    return [k, typeof e === 'string' && /^#[0-9a-f]{6}$/i.test(e) ? e.toUpperCase() : v];
+  }));
+  const next = {...prev, colors};
+  fs.writeFileSync(styleFile(p.id), JSON.stringify(next, null, 2) + '\n');
+  p.styleEdited = true; saveProject(p);
+  appendLog(p.id, {kind: 'system', text: req.body.reset ? 'You reset the colours.' : 'You changed the colours.'});
+  changed(p.id);
+  res.json(next);
+}));
+app.post('/api/projects/:id/make-style-editable', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  startTurn(p, stylePrompt(p), 'Move the colours into style.json so they are editable in the browser');
+  res.json({ok: true});
+}));
+// live controls of the background layer Claude built: src/studio/<id>/background.json {enabled, opacity, speed}
+const bgFile = (id) => path.join(projectCode(id), 'background.json');
+const readBackground = (id) => { try { return JSON.parse(fs.readFileSync(bgFile(id), 'utf8')); } catch { return null; } };
+app.put('/api/projects/:id/background-settings', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const prev = readBackground(p.id);
+  if (!prev) return res.status(400).json({error: 'This video has no background layer yet'});
+  const b = req.body ?? {};
+  const next = {...prev, enabled: 'enabled' in b ? !!b.enabled : prev.enabled !== false, opacity: clampNum(b.opacity, 0, 1.5, prev.opacity ?? 1), speed: clampNum(b.speed, 0.1, 4, prev.speed ?? 1)};
+  fs.writeFileSync(bgFile(p.id), JSON.stringify(next, null, 2) + '\n');
+  appendLog(p.id, {kind: 'system', text: 'You adjusted the background objects.'});
+  changed(p.id);
+  res.json(next);
+}));
+// sound files already in the Remotion project's public/ folder (voiceovers, music, sfx) to pick from
+app.get('/api/audio-library', wrap(async (req, res) => {
+  const dir = path.join(REEL, 'public');
+  res.json(fs.readdirSync(dir).filter((f) => /\.(mp3|wav|m4a|aac|ogg)$/i.test(f)).sort().map((f) => ({src: f, size: fs.statSync(path.join(dir, f)).size})));
 }));
 
 // re-render the check frames (times come from their names: "...-2.4s.png" or "...-f37.png")

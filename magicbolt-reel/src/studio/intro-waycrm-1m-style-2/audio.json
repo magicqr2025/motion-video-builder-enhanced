@@ -1,0 +1,4 @@
+{
+  "voiceover": {"src": "studio/intro-waycrm-1m-style-2/ElevenLabs_2026-10-20T20_45_11_vijay-a-mqrvoice_ivc_sp100_s50_sb75_v4.mp3", "volume": 1, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": 76.8, "durationSec": 78.1},
+  "music": {"src": null, "volume": 0.25, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": null, "loop": true, "fadeInSec": 1, "fadeOutSec": 2, "duck": true, "duckLevel": 0.35}
+}

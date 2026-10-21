@@ -1,0 +1,86 @@
+{
+  "_help": {
+    "Hook.lines": "two short lines, said 'platforms' then 'clients'",
+    "Hook.tabs": "browser tabs that merge into one (concept B)",
+    "Brand.domain": "demo white-label domain shown in the URL bar",
+    "WhiteLabel.title": "six words; each pair lands on 'brand', 'domain', 'pricing'",
+    "Agency.steps": "five items, said in this order",
+    "Revenue.title": "four words: first two on 'scalable services', last two on 'recurring revenue'",
+    "End.cta": "button text, max ~32 chars",
+    "Tagline": "three short lines, said in this order"
+  },
+  "Brand": {
+    "product": "MagicBolt AI",
+    "site": "www.magicbolt.ai",
+    "agency": "Your Agency",
+    "domain": "app.youragency.com"
+  },
+  "Hook": {
+    "kicker": "Running a marketing agency?",
+    "lines": ["Too many platforms.", "Too many clients."],
+    "tabs": ["Google Business", "Facebook", "Instagram", "WhatsApp", "Sheets", "Invoices"],
+    "headline": "The All-in-One Agency Platform"
+  },
+  "Meet": {
+    "meet": "Meet",
+    "lead": "The All-in-One Agency Platform"
+  },
+  "WhiteLabel": {
+    "title": "Your Brand. Your Domain. Your Pricing.",
+    "sub": "One white-label platform",
+    "verified": "Verified",
+    "kit": "Brand kit",
+    "nameLabel": "Brand name",
+    "colourLabel": "Brand colour",
+    "domainLabel": "Custom domain"
+  },
+  "Channels": {
+    "title": "Manage GBP, Facebook, Instagram & WhatsApp",
+    "sub": "Every client, one dashboard",
+    "items": ["Google Business Profile", "Facebook", "Instagram", "WhatsApp"]
+  },
+  "Calendar": {
+    "title": "Unified Content Calendar",
+    "sub": "Write once, schedule everywhere",
+    "write": "Write one post"
+  },
+  "AI": {
+    "title": "AI-Powered Posts & Replies",
+    "sub": "Drafted in your client's voice",
+    "post": "Post drafted",
+    "reply": "Review reply drafted"
+  },
+  "Rank": {
+    "title": "Local Rank Tracking & Profile Audits",
+    "sub": "See every client against competitors",
+    "audit": "Profile audit",
+    "compete": "Head-to-head"
+  },
+  "QR": {
+    "title": "Magic QR & Review Collection",
+    "sub": "Plus instant websites in minutes",
+    "web": "Website live in minutes"
+  },
+  "Agency": {
+    "title": "Built-in Agency Workspace",
+    "sub": "Billing, Clients, Plans",
+    "steps": ["Onboard clients", "Create plans", "Approve subscriptions", "Send invoices", "Email every client"]
+  },
+  "ClientView": {
+    "kicker": "Your clients only ever see",
+    "brand": "Your brand",
+    "domain": "Your domain",
+    "prices": ["₹999", "₹2,499", "₹5,999"],
+    "perMonth": "/mo"
+  },
+  "Revenue": {
+    "title": "Scalable Services. Recurring Revenue.",
+    "label": "Recurring revenue",
+    "unit": "L / month"
+  },
+  "Tagline": ["Your Brand.", "Your Platform.", "Your Growth."],
+  "End": {
+    "cta": "Build your white-label business",
+    "lead": "The All-in-One Agency Platform"
+  }
+}

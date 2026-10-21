@@ -15,6 +15,20 @@ const TEXT_RULE = `EVERY on-screen string (headlines, captions, labels, names, p
   (auto-fit font size or wrap) because the user may retype it. Keys starting with "_" are hidden from the user
   (use "_help": {"Hook.headline": "max ~25 chars"} for hints).`;
 
+// The Audio tab edits this file, and registry.tsx plays it, so a video must never render its own <Audio>.
+const AUDIO_RULE = `The soundtrack (voiceover and background music) lives in src/studio/<id>/audio.json, NEVER as an <Audio> in
+  the video's .tsx: registry.tsx plays it for the Studio-<id> composition (run \`node ../studio/bin/registry.mjs\` after
+  creating the file). Shape: {"voiceover": {"src": "studio/<id>/vo.mp3", "volume": 1, "muted": false, "startSec": 0,
+  "trimStartSec": 0, "trimEndSec": null, "durationSec": <file length>}, "music": {same fields, "src": null when none, "volume": 0.25,
+  "loop": true, "fadeInSec": 1, "fadeOutSec": 2, "duck": true, "duckLevel": 0.35}}. src is relative to public/; trimEndSec cuts
+  a stray tail of the file (use it instead of cutting the file); startSec places the track on the video timeline.`;
+
+const STYLE_RULE = `The brand palette (the handful of named colours the design is built from, e.g. NAVY, BLUE, GOLD) lives in
+  src/studio/<id>/style.json: {"colors": {"NAVY": "#0E1B4D", ...}, "_defaults": {same keys and values}, "_labels": {"NAVY": "Headlines & dark text", ...}}.
+  config.ts does \`import STYLE from './style.json'; const C = STYLE.colors; export const NAVY = C.NAVY;\` and the video imports the
+  named colours from config.ts, never a hex literal for a palette colour. Labels say in plain words where each colour is used.
+  Tints and shadows derived from them may stay as literals. The user edits these colours in the browser's Style tab.`;
+
 export const SYSTEM = `
 # You are the video designer inside "MagicBolt Video Studio"
 
@@ -53,6 +67,8 @@ review it and render. Your text replies appear in the app's activity panel: keep
 - Keep timings, colours and layout numbers in one config.ts per project (scene \`dur\` in seconds, cues in seconds
   from the scene start, a "// VO 12.40" comment with each scene's start in the voiceover), like src/qr/config.ts.
 - ${TEXT_RULE}
+- ${AUDIO_RULE}
+- ${STYLE_RULE}
 - Timing is driven by the voiceover when there is one: scene starts at sentence starts, key reveals on the spoken
   word. Without audio, aim for ~2.5 words/s of on-screen reading plus 0.4 s breathing room per beat.
 
@@ -133,7 +149,8 @@ The user approved concept "${conceptId}"${notes ? ` with these notes:\n> ${notes
 1. Build ${compId(p.id)} (${p.brief.width}x${p.brief.height}, ${p.brief.fps} fps) in ${rel(projectCode(p.id))}/ in that concept's look,
    reusing the concept components. Keep ${conceptsCompId(p.id)} working. Timings in config.ts; every on-screen
    string in ${rel(projectCode(p.id))}/text.json (the user edits it in the browser).
-2. Timing: sync to the voiceover sentence and word times when there is audio (include the <Audio>); otherwise pace
+2. Timing: sync to the voiceover sentence and word times when there is audio (write the voiceover and any music into
+   ${rel(projectCode(p.id))}/audio.json, not an <Audio>; the user edits the mix in the browser); otherwise pace
    for reading. Add captions as the brief says.
 3. Write ${projectDir(p.id)}/storyboard.json with the real timing:
    {"composition": "${compId(p.id)}", "fps": ${p.brief.fps}, "width": ${p.brief.width}, "height": ${p.brief.height}, "durationSec": 0,
@@ -163,4 +180,46 @@ ${rel(projectCode(p.id))}/text.json and read it from there. The rule: ${TEXT_RUL
 Keep the look and timing identical. Typecheck, render 2 check stills to compare with the existing checks/, and
 reply with one line.`;
 
-export const textEditedNote = (p) => `(Note: the user edited ${rel(projectCode(p.id))}/text.json directly in the browser. Keep their wording unless they ask otherwise.)`;
+export const audioPrompt = (p) => `Make this video's audio editable from the browser.
+${compId(p.id)} currently plays its soundtrack from its own code. Move it into ${rel(projectCode(p.id))}/audio.json and remove every
+<Audio> for the voiceover/music from the video's .tsx (keep sound effects that are tied to a scene, if any). The rule: ${AUDIO_RULE}
+Carry over the exact file, trim and volume it uses today. Then run \`node ../studio/bin/registry.mjs\`, typecheck, and reply with one line.`;
+
+export const BG_OBJECTS = {
+  icons: 'glossy 3D icons in the brand style (use the real illustrations/icons in public/ and the kit, never flat emoji)',
+  sparkles: 'sparkles and soft particles',
+  blobs: 'soft blurred gradient blobs in the brand colours',
+  shapes: 'floating rounded shapes, rings and pills',
+  grid: 'a slow-moving grid or dotted pattern',
+};
+
+export const backgroundPrompt = (p, o) => `Add animated background objects to ${compId(p.id)}.
+First look at the scenes (code and the check stills in ${projectDir(p.id)}/checks/). If a scene already has a moving background, say so in your reply and
+only add to scenes that are static; never stack a second busy layer on top of an existing one.
+The user's request:
+- Objects: ${o.objects.length ? o.objects.map((k) => BG_OBJECTS[k]).join('; ') : 'your choice, fitting the brand'}${o.custom ? `\n- Also: ${o.custom}` : ''}
+- Placement: ${o.placement === 'edges' ? 'only in the empty areas around the content and the edges, clear of text and screenshots' : 'behind everything'}
+- Intensity: ${o.intensity} (subtle = barely noticed, slow drift; medium = clearly alive; lively = energetic but still never competing with the content)
+- Colours: ${o.colors || 'the video\'s brand colours'}
+- Scenes: ${o.scenes || 'all scenes'}
+How:
+1. Build one component, ${rel(projectCode(p.id))}/Background.tsx, rendered as the first layer of the video (above any solid/gradient base, below all scene content).
+   Keep colours and layout as named constants at the top. Read the user's live controls from ${rel(projectCode(p.id))}/background.json
+   (create it as {"enabled": true, "opacity": 1, "speed": 1}; if it already exists keep its values) and import it like text.json: return null
+   when !enabled, multiply every object's opacity by \`opacity\` and the animation clock by \`speed\`. Fully deterministic: animate only from
+   useCurrentFrame()/fps and seeded positions (no Math.random). Semi-transparent so it never competes with text. Loop smoothly across scene crossfades.
+2. Do not change text, scene timing or the audio (${rel(projectCode(p.id))}/audio.json). Keep ${conceptsCompId(p.id)} working.
+3. Typecheck, render 4-6 check stills across the timeline into ${projectDir(p.id)}/checks/ (names like bg-02-4.0s.png), look at every one, fix
+   overlaps with text or clutter, re-render.
+Reply with 2-3 short lines: what you added and where (the user adjusts on/off, amount and speed in the app's Background tab).`;
+
+export const audioEditedNote =(p) => `(Note: the user changed the audio mix in ${rel(projectCode(p.id))}/audio.json from the browser. Keep those settings unless they ask otherwise.)`;
+
+export const stylePrompt = (p) => `Make this video's colours editable from the browser.
+Move the named palette colours of ${compId(p.id)} (and ${conceptsCompId(p.id)}) into ${rel(projectCode(p.id))}/style.json. The rule: ${STYLE_RULE}
+Replace palette hex literals in the code with the named imports where they clearly mean a palette colour. Keep the look identical.
+Typecheck, render 2 check stills to compare with the existing checks/, and reply with one line.`;
+
+export const styleEditedNote = (p) => `(Note: the user changed colours in ${rel(projectCode(p.id))}/style.json from the browser. Keep those values unless they ask otherwise.)`;
+
+export const textEditedNote =(p) => `(Note: the user edited ${rel(projectCode(p.id))}/text.json directly in the browser. Keep their wording unless they ask otherwise.)`;

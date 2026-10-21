@@ -1,9 +1,9 @@
 // Way CRM intro, full video (concept A "Glass Showroom"), synced to the voiceover.
 // Scene timings and cues live in config.ts (SCENES / CUE); every string in text.json.
 import React from 'react';
-import {AbsoluteFill, Audio, Freeze, Sequence, staticFile, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Freeze, Sequence, staticFile, useVideoConfig} from 'remotion';
 import {LogoAnim} from '../../logo/LogoAnim';
-import {AUDIO, BLUE, CROP, CUE, DEEP, GOLD, NAVY, ORANGE, SCENES, SceneKey, ShotName, SLATE, XFADE} from './config';
+import {BLUE, CROP, CUE, DEEP, GOLD, NAVY, ORANGE, SCENES, SceneKey, ShotName, SLATE, XFADE} from './config';
 import TEXT from './text.json';
 import {Abs, bob, CtaBlock, Cursor, fmt, RowCard} from './Concepts';
 import {Crop, Feature, Gl, Glyph, IconChip, In, Lift, Screen, SkyBG, Sparkle, Tx, WaChip, Words, cl, eb, eo, fit, lerp, P, useSec} from './parts';
@@ -426,6 +426,6 @@ export const WayCrmVideo: React.FC = () => (
     <Scene k="control"><Control /></Scene>
     <Scene k="tagline"><Tagline /></Scene>
     <Scene k="cta" last><Cta /></Scene>
-    <Audio src={staticFile(AUDIO.src)} />
+    {/* soundtrack: audio.json, added by registry.tsx (edit it in the Studio Audio tab) */}
   </AbsoluteFill>
 );

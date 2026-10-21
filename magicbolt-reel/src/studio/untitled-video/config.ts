@@ -4,13 +4,15 @@
 
 export const W = {fps: 24, width: 1920, height: 1080};
 
-export const NAVY = '#0E1B4D';
-export const DEEP = '#1354BC';
-export const BLUE = '#1582D5';
-export const GOLD = '#FDC60B';
-export const ORANGE = '#F7941D';
-export const SLATE = '#5A6488';
-export const WA = '#25D366';
+import STYLE from './style.json';
+const C = STYLE.colors; // editable in the Studio's Style tab
+export const NAVY = C.NAVY;
+export const DEEP = C.DEEP;
+export const BLUE = C.BLUE;
+export const GOLD = C.GOLD;
+export const ORANGE = C.ORANGE;
+export const SLATE = C.SLATE;
+export const WA = C.WA;
 
 export const SHOT = {
   dashboard: 'studio/untitled-video/01-dashboard.png',

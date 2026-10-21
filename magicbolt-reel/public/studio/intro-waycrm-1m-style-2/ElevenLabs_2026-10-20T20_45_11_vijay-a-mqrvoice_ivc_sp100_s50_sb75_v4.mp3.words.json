@@ -1,0 +1,1023 @@
+{
+ "duration": 78.11,
+ "language": "en",
+ "words": [
+  {
+   "text": "Running",
+   "start": 0.06,
+   "end": 0.46
+  },
+  {
+   "text": "a",
+   "start": 0.46,
+   "end": 0.5
+  },
+  {
+   "text": "digital",
+   "start": 0.53,
+   "end": 0.98
+  },
+  {
+   "text": "marketing",
+   "start": 0.98,
+   "end": 1.57
+  },
+  {
+   "text": "agency",
+   "start": 1.57,
+   "end": 2
+  },
+  {
+   "text": "means",
+   "start": 2,
+   "end": 2.32
+  },
+  {
+   "text": "juggling",
+   "start": 2.41,
+   "end": 2.78
+  },
+  {
+   "text": "with",
+   "start": 2.78,
+   "end": 2.86
+  },
+  {
+   "text": "platforms,",
+   "start": 3.05,
+   "end": 3.8
+  },
+  {
+   "text": "a",
+   "start": 3.85,
+   "end": 3.87
+  },
+  {
+   "text": "growing",
+   "start": 3.87,
+   "end": 4.37
+  },
+  {
+   "text": "list",
+   "start": 4.37,
+   "end": 4.63
+  },
+  {
+   "text": "of",
+   "start": 4.79,
+   "end": 4.79
+  },
+  {
+   "text": "clients",
+   "start": 4.83,
+   "end": 5.13
+  },
+  {
+   "text": "and",
+   "start": 5.36,
+   "end": 5.52
+  },
+  {
+   "text": "the",
+   "start": 5.52,
+   "end": 5.56
+  },
+  {
+   "text": "constant",
+   "start": 5.75,
+   "end": 6.23
+  },
+  {
+   "text": "pressure",
+   "start": 6.31,
+   "end": 6.57
+  },
+  {
+   "text": "to",
+   "start": 6.62,
+   "end": 6.74
+  },
+  {
+   "text": "manage.",
+   "start": 6.74,
+   "end": 7.44
+  },
+  {
+   "text": "Magic",
+   "start": 7.56,
+   "end": 7.88
+  },
+  {
+   "text": "Bolt",
+   "start": 7.88,
+   "end": 8.16
+  },
+  {
+   "text": "AI",
+   "start": 8.28,
+   "end": 8.4
+  },
+  {
+   "text": "brings",
+   "start": 8.4,
+   "end": 8.93
+  },
+  {
+   "text": "it",
+   "start": 8.93,
+   "end": 8.94
+  },
+  {
+   "text": "all",
+   "start": 9.18,
+   "end": 9.4
+  },
+  {
+   "text": "into",
+   "start": 9.4,
+   "end": 9.68
+  },
+  {
+   "text": "one",
+   "start": 9.68,
+   "end": 10.08
+  },
+  {
+   "text": "white",
+   "start": 10.08,
+   "end": 10.28
+  },
+  {
+   "text": "label",
+   "start": 10.36,
+   "end": 10.62
+  },
+  {
+   "text": "platform",
+   "start": 10.7,
+   "end": 11.12
+  },
+  {
+   "text": "with",
+   "start": 11.39,
+   "end": 11.54
+  },
+  {
+   "text": "your",
+   "start": 11.61,
+   "end": 11.8
+  },
+  {
+   "text": "brand,",
+   "start": 11.8,
+   "end": 12.19
+  },
+  {
+   "text": "your",
+   "start": 12.34,
+   "end": 12.53
+  },
+  {
+   "text": "domain,",
+   "start": 12.53,
+   "end": 12.99
+  },
+  {
+   "text": "and",
+   "start": 13.1,
+   "end": 13.26
+  },
+  {
+   "text": "your",
+   "start": 13.26,
+   "end": 13.48
+  },
+  {
+   "text": "pricing.",
+   "start": 13.6,
+   "end": 14.32
+  },
+  {
+   "text": "For",
+   "start": 14.45,
+   "end": 14.53
+  },
+  {
+   "text": "every",
+   "start": 14.63,
+   "end": 14.88
+  },
+  {
+   "text": "client,",
+   "start": 14.88,
+   "end": 15.31
+  },
+  {
+   "text": "manage",
+   "start": 15.49,
+   "end": 15.77
+  },
+  {
+   "text": "Google",
+   "start": 15.81,
+   "end": 16.1
+  },
+  {
+   "text": "Business",
+   "start": 16.1,
+   "end": 16.42
+  },
+  {
+   "text": "Profile,",
+   "start": 16.56,
+   "end": 16.99
+  },
+  {
+   "text": "Facebook,",
+   "start": 17.23,
+   "end": 17.63
+  },
+  {
+   "text": "Instagram,",
+   "start": 17.88,
+   "end": 18.52
+  },
+  {
+   "text": "WhatsApp,",
+   "start": 18.59,
+   "end": 19.33
+  },
+  {
+   "text": "and",
+   "start": 19.33,
+   "end": 19.53
+  },
+  {
+   "text": "more",
+   "start": 19.53,
+   "end": 19.77
+  },
+  {
+   "text": "from",
+   "start": 19.91,
+   "end": 20.07
+  },
+  {
+   "text": "a",
+   "start": 20.07,
+   "end": 20.07
+  },
+  {
+   "text": "single",
+   "start": 20.28,
+   "end": 20.55
+  },
+  {
+   "text": "dashboard.",
+   "start": 20.55,
+   "end": 21.4
+  },
+  {
+   "text": "Write",
+   "start": 21.5,
+   "end": 21.77
+  },
+  {
+   "text": "one",
+   "start": 21.77,
+   "end": 21.99
+  },
+  {
+   "text": "post,",
+   "start": 21.99,
+   "end": 22.31
+  },
+  {
+   "text": "schedule",
+   "start": 22.68,
+   "end": 22.95
+  },
+  {
+   "text": "it",
+   "start": 22.95,
+   "end": 23.02
+  },
+  {
+   "text": "for",
+   "start": 23.13,
+   "end": 23.2
+  },
+  {
+   "text": "each",
+   "start": 23.33,
+   "end": 23.53
+  },
+  {
+   "text": "channel",
+   "start": 23.53,
+   "end": 23.93
+  },
+  {
+   "text": "and",
+   "start": 24.06,
+   "end": 24.17
+  },
+  {
+   "text": "everywhere",
+   "start": 24.37,
+   "end": 24.95
+  },
+  {
+   "text": "on",
+   "start": 25.01,
+   "end": 25.12
+  },
+  {
+   "text": "one",
+   "start": 25.12,
+   "end": 25.34
+  },
+  {
+   "text": "content",
+   "start": 25.34,
+   "end": 25.86
+  },
+  {
+   "text": "calendar.",
+   "start": 25.86,
+   "end": 26.72
+  },
+  {
+   "text": "Our",
+   "start": 26.79,
+   "end": 26.93
+  },
+  {
+   "text": "AI",
+   "start": 27.02,
+   "end": 27.09
+  },
+  {
+   "text": "assistant",
+   "start": 27.09,
+   "end": 27.78
+  },
+  {
+   "text": "drafts",
+   "start": 27.78,
+   "end": 28.21
+  },
+  {
+   "text": "the",
+   "start": 28.26,
+   "end": 28.31
+  },
+  {
+   "text": "post",
+   "start": 28.42,
+   "end": 28.57
+  },
+  {
+   "text": "and",
+   "start": 28.79,
+   "end": 28.92
+  },
+  {
+   "text": "the",
+   "start": 28.92,
+   "end": 29.12
+  },
+  {
+   "text": "review",
+   "start": 29.12,
+   "end": 29.49
+  },
+  {
+   "text": "replies",
+   "start": 29.59,
+   "end": 29.98
+  },
+  {
+   "text": "for",
+   "start": 29.98,
+   "end": 30.19
+  },
+  {
+   "text": "each",
+   "start": 30.19,
+   "end": 30.46
+  },
+  {
+   "text": "one.",
+   "start": 30.46,
+   "end": 30.88
+  },
+  {
+   "text": "Track",
+   "start": 31.03,
+   "end": 31.16
+  },
+  {
+   "text": "local",
+   "start": 31.25,
+   "end": 31.52
+  },
+  {
+   "text": "rankings",
+   "start": 31.52,
+   "end": 32.04
+  },
+  {
+   "text": "on",
+   "start": 32.04,
+   "end": 32.17
+  },
+  {
+   "text": "the",
+   "start": 32.17,
+   "end": 32.36
+  },
+  {
+   "text": "map,",
+   "start": 32.36,
+   "end": 32.72
+  },
+  {
+   "text": "audit",
+   "start": 32.81,
+   "end": 33.03
+  },
+  {
+   "text": "Google",
+   "start": 33.04,
+   "end": 33.36
+  },
+  {
+   "text": "profiles,",
+   "start": 33.36,
+   "end": 33.89
+  },
+  {
+   "text": "and",
+   "start": 33.97,
+   "end": 34.14
+  },
+  {
+   "text": "compare",
+   "start": 34.14,
+   "end": 34.57
+  },
+  {
+   "text": "every",
+   "start": 34.76,
+   "end": 34.89
+  },
+  {
+   "text": "client",
+   "start": 34.89,
+   "end": 35.26
+  },
+  {
+   "text": "against",
+   "start": 35.26,
+   "end": 35.7
+  },
+  {
+   "text": "their",
+   "start": 35.7,
+   "end": 36.01
+  },
+  {
+   "text": "competitors.",
+   "start": 36.01,
+   "end": 36.92
+  },
+  {
+   "text": "Add",
+   "start": 37.01,
+   "end": 37.14
+  },
+  {
+   "text": "magic",
+   "start": 37.14,
+   "end": 37.51
+  },
+  {
+   "text": "QR",
+   "start": 37.51,
+   "end": 37.52
+  },
+  {
+   "text": "cards",
+   "start": 37.66,
+   "end": 38.03
+  },
+  {
+   "text": "and",
+   "start": 38.03,
+   "end": 38.25
+  },
+  {
+   "text": "review",
+   "start": 38.25,
+   "end": 38.65
+  },
+  {
+   "text": "collection",
+   "start": 38.74,
+   "end": 39.12
+  },
+  {
+   "text": "to",
+   "start": 39.12,
+   "end": 39.25
+  },
+  {
+   "text": "every",
+   "start": 39.41,
+   "end": 39.62
+  },
+  {
+   "text": "client's",
+   "start": 39.62,
+   "end": 40.19
+  },
+  {
+   "text": "toolkit",
+   "start": 40.19,
+   "end": 40.5
+  },
+  {
+   "text": "and",
+   "start": 40.78,
+   "end": 40.89
+  },
+  {
+   "text": "launch",
+   "start": 40.89,
+   "end": 41.12
+  },
+  {
+   "text": "instant",
+   "start": 41.34,
+   "end": 41.68
+  },
+  {
+   "text": "websites",
+   "start": 41.68,
+   "end": 42.16
+  },
+  {
+   "text": "in",
+   "start": 42.35,
+   "end": 42.58
+  },
+  {
+   "text": "minutes.",
+   "start": 42.58,
+   "end": 44.12
+  },
+  {
+   "text": "Then",
+   "start": 44.19,
+   "end": 44.44
+  },
+  {
+   "text": "run",
+   "start": 44.44,
+   "end": 44.68
+  },
+  {
+   "text": "the",
+   "start": 44.68,
+   "end": 44.92
+  },
+  {
+   "text": "agency",
+   "start": 44.92,
+   "end": 45.39
+  },
+  {
+   "text": "itself.",
+   "start": 45.39,
+   "end": 46.16
+  },
+  {
+   "text": "Onboard",
+   "start": 46.25,
+   "end": 46.58
+  },
+  {
+   "text": "clients",
+   "start": 46.58,
+   "end": 46.95
+  },
+  {
+   "text": "through",
+   "start": 47.12,
+   "end": 47.34
+  },
+  {
+   "text": "your",
+   "start": 47.47,
+   "end": 47.68
+  },
+  {
+   "text": "own",
+   "start": 47.68,
+   "end": 47.81
+  },
+  {
+   "text": "website,",
+   "start": 47.92,
+   "end": 48.32
+  },
+  {
+   "text": "create",
+   "start": 48.43,
+   "end": 48.68
+  },
+  {
+   "text": "plans,",
+   "start": 48.83,
+   "end": 49.11
+  },
+  {
+   "text": "approve",
+   "start": 49.11,
+   "end": 49.54
+  },
+  {
+   "text": "subscriptions,",
+   "start": 49.54,
+   "end": 50.38
+  },
+  {
+   "text": "send",
+   "start": 50.66,
+   "end": 50.81
+  },
+  {
+   "text": "invoices,",
+   "start": 50.81,
+   "end": 51.52
+  },
+  {
+   "text": "and",
+   "start": 51.52,
+   "end": 51.69
+  },
+  {
+   "text": "email",
+   "start": 51.81,
+   "end": 52.11
+  },
+  {
+   "text": "your",
+   "start": 52.11,
+   "end": 52.32
+  },
+  {
+   "text": "whole",
+   "start": 52.53,
+   "end": 52.73
+  },
+  {
+   "text": "client",
+   "start": 52.85,
+   "end": 53.21
+  },
+  {
+   "text": "base",
+   "start": 53.21,
+   "end": 53.3
+  },
+  {
+   "text": "all",
+   "start": 53.58,
+   "end": 53.79
+  },
+  {
+   "text": "in",
+   "start": 53.79,
+   "end": 53.97
+  },
+  {
+   "text": "one",
+   "start": 53.97,
+   "end": 54.24
+  },
+  {
+   "text": "agency",
+   "start": 54.24,
+   "end": 54.74
+  },
+  {
+   "text": "workspace.",
+   "start": 54.78,
+   "end": 55.88
+  },
+  {
+   "text": "Your",
+   "start": 56.05,
+   "end": 56.18
+  },
+  {
+   "text": "clients",
+   "start": 56.18,
+   "end": 56.71
+  },
+  {
+   "text": "log",
+   "start": 56.71,
+   "end": 56.94
+  },
+  {
+   "text": "into",
+   "start": 56.94,
+   "end": 57.2
+  },
+  {
+   "text": "your",
+   "start": 57.27,
+   "end": 57.52
+  },
+  {
+   "text": "brand",
+   "start": 57.56,
+   "end": 57.85
+  },
+  {
+   "text": "on",
+   "start": 58.03,
+   "end": 58.14
+  },
+  {
+   "text": "your",
+   "start": 58.14,
+   "end": 58.51
+  },
+  {
+   "text": "domain",
+   "start": 58.51,
+   "end": 58.95
+  },
+  {
+   "text": "at",
+   "start": 59.12,
+   "end": 59.28
+  },
+  {
+   "text": "your",
+   "start": 59.39,
+   "end": 59.83
+  },
+  {
+   "text": "prices.",
+   "start": 59.83,
+   "end": 60.6
+  },
+  {
+   "text": "Turn",
+   "start": 60.72,
+   "end": 60.87
+  },
+  {
+   "text": "everyday",
+   "start": 60.87,
+   "end": 61.41
+  },
+  {
+   "text": "marketing",
+   "start": 61.41,
+   "end": 62.01
+  },
+  {
+   "text": "tasks",
+   "start": 62.01,
+   "end": 62.23
+  },
+  {
+   "text": "into",
+   "start": 62.36,
+   "end": 62.64
+  },
+  {
+   "text": "scalable",
+   "start": 62.85,
+   "end": 63.19
+  },
+  {
+   "text": "services",
+   "start": 63.3,
+   "end": 63.72
+  },
+  {
+   "text": "and",
+   "start": 63.8,
+   "end": 64.11
+  },
+  {
+   "text": "recurring",
+   "start": 64.11,
+   "end": 64.87
+  },
+  {
+   "text": "revenue.",
+   "start": 65.76,
+   "end": 66.07
+  },
+  {
+   "text": "Magic",
+   "start": 66.21,
+   "end": 66.94
+  },
+  {
+   "text": "Bolt",
+   "start": 67.09,
+   "end": 67.53
+  },
+  {
+   "text": "AI,",
+   "start": 68.28,
+   "end": 68.5
+  },
+  {
+   "text": "your",
+   "start": 68.5,
+   "end": 68.92
+  },
+  {
+   "text": "brand,",
+   "start": 68.92,
+   "end": 69.72
+  },
+  {
+   "text": "your",
+   "start": 69.82,
+   "end": 70.11
+  },
+  {
+   "text": "platform,",
+   "start": 70.2,
+   "end": 71.4
+  },
+  {
+   "text": "your",
+   "start": 71.5,
+   "end": 71.91
+  },
+  {
+   "text": "growth.",
+   "start": 71.95,
+   "end": 72.8
+  },
+  {
+   "text": "Visit",
+   "start": 72.88,
+   "end": 73.25
+  },
+  {
+   "text": "magicbolt.ai",
+   "start": 73.25,
+   "end": 74.46
+  },
+  {
+   "text": "and",
+   "start": 74.6,
+   "end": 74.73
+  },
+  {
+   "text": "build",
+   "start": 74.73,
+   "end": 75.08
+  },
+  {
+   "text": "your",
+   "start": 75.21,
+   "end": 75.4
+  },
+  {
+   "text": "white",
+   "start": 75.4,
+   "end": 75.6
+  },
+  {
+   "text": "label",
+   "start": 75.7,
+   "end": 75.94
+  },
+  {
+   "text": "business",
+   "start": 75.96,
+   "end": 76.28
+  },
+  {
+   "text": "today.",
+   "start": 76.35,
+   "end": 77.04
+  },
+  {
+   "text": "How",
+   "start": 77.2,
+   "end": 77.29
+  },
+  {
+   "text": "to",
+   "start": 77.29,
+   "end": 77.46
+  },
+  {
+   "text": "use",
+   "start": 77.46,
+   "end": 77.65
+  },
+  {
+   "text": "it?",
+   "start": 77.72,
+   "end": 77.93
+  }
+ ],
+ "sentences": [
+  {
+   "text": "Running a digital marketing agency means juggling with platforms, a growing list of clients and the constant pressure to manage.",
+   "start": 0.06,
+   "end": 7.44
+  },
+  {
+   "text": "Magic Bolt AI brings it all into one white label platform with your brand, your domain, and your pricing.",
+   "start": 7.56,
+   "end": 14.32
+  },
+  {
+   "text": "For every client, manage Google Business Profile, Facebook, Instagram, WhatsApp, and more from a single dashboard.",
+   "start": 14.45,
+   "end": 21.4
+  },
+  {
+   "text": "Write one post, schedule it for each channel and everywhere on one content calendar.",
+   "start": 21.5,
+   "end": 26.72
+  },
+  {
+   "text": "Our AI assistant drafts the post and the review replies for each one.",
+   "start": 26.79,
+   "end": 30.88
+  },
+  {
+   "text": "Track local rankings on the map, audit Google profiles, and compare every client against their competitors.",
+   "start": 31.03,
+   "end": 36.92
+  },
+  {
+   "text": "Add magic QR cards and review collection to every client's toolkit and launch instant websites in minutes.",
+   "start": 37.01,
+   "end": 44.12
+  },
+  {
+   "text": "Then run the agency itself.",
+   "start": 44.19,
+   "end": 46.16
+  },
+  {
+   "text": "Onboard clients through your own website, create plans, approve subscriptions, send invoices, and email your whole client base all in one agency workspace.",
+   "start": 46.25,
+   "end": 55.88
+  },
+  {
+   "text": "Your clients log into your brand on your domain at your prices.",
+   "start": 56.05,
+   "end": 60.6
+  },
+  {
+   "text": "Turn everyday marketing tasks into scalable services and recurring",
+   "start": 60.72,
+   "end": 64.87
+  },
+  {
+   "text": "revenue.",
+   "start": 65.76,
+   "end": 66.07
+  },
+  {
+   "text": "Magic Bolt",
+   "start": 66.21,
+   "end": 67.53
+  },
+  {
+   "text": "AI, your brand, your platform, your growth.",
+   "start": 68.28,
+   "end": 72.8
+  },
+  {
+   "text": "Visit magicbolt.ai and build your white label business today.",
+   "start": 72.88,
+   "end": 77.04
+  },
+  {
+   "text": "How to use it?",
+   "start": 77.2,
+   "end": 77.93
+  }
+ ]
+}

@@ -155,9 +155,9 @@ const renderHome = () => {
 };
 
 // ---------- project shell ----------
-const TABS = [['brief', 'Brief'], ['concepts', 'Concepts'], ['build', 'Build & timing'], ['text', 'Text'], ['render', 'Preview & render']];
-const tabEnabled = (t, p, cur) => t === 'brief' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text') && cur.storyboard);
-const tabDone = (t, p) => ({brief: p.status !== 'brief', concepts: !!p.approvedConcept, build: ['review', 'rendering', 'done'].includes(p.status), text: false, render: p.renders.length > 0}[t]);
+const TABS = [['brief', 'Brief'], ['concepts', 'Concepts'], ['build', 'Build & timing'], ['text', 'Text'], ['style', 'Style'], ['audio', 'Audio'], ['background', 'Background'], ['render', 'Preview & render']];
+const tabEnabled = (t, p, cur) => t === 'brief' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard);
+const tabDone = (t, p) => ({brief: p.status !== 'brief', concepts: !!p.approvedConcept, build: ['review', 'rendering', 'done'].includes(p.status), text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
 
 const renderProject = () => {
   const {project: p} = S.cur;
@@ -173,7 +173,7 @@ const renderProject = () => {
     </div>
     <div class="tabs">${tabs}</div>
     <div id="tab"></div>`;
-  ({brief: renderBrief, concepts: renderConcepts, build: renderBuild, text: renderText, render: renderRender}[S.tab] ?? renderBrief)();
+  ({brief: renderBrief, concepts: renderConcepts, build: renderBuild, text: renderText, style: renderStyle, audio: renderAudio, background: renderBackground, render: renderRender}[S.tab] ?? renderBrief)();
 };
 
 // ---------- 1 · brief ----------
@@ -412,6 +412,195 @@ const renderText = () => {
     </div>`;
 };
 
+// ---------- audio: edit src/studio/<id>/audio.json (voiceover + music) ----------
+const audioUrl = (src) => `/public/${String(src).split('/').map(encodeURIComponent).join('/')}`;
+const baseName = (src) => String(src).split('/').pop();
+const AUDIO_SLOTS = {
+  voiceover: ['Voiceover', 'The spoken track. The scene timing is built around it.'],
+  music: ['Background music', 'Plays under the voiceover. Loops to fill the video and lowers while the voice speaks.'],
+};
+
+const srcSelect = (slot, cur) => {
+  const {project: p} = S.cur;
+  const mine = p.assets.filter((a) => a.kind === 'audio' || a.kind === 'video').map((a) => [`studio/${p.id}/${a.file}`, a.original]);
+  const lib = (S.audioLib ?? []).map((f) => [f.src, f.src]);
+  const known = new Set([...mine, ...lib].map(([v]) => v));
+  const opt = ([v, l]) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+  return `<select data-a="${slot}.src"><option value="">${slot === 'music' ? 'No music' : 'No voiceover'}</option>
+    ${cur && !known.has(cur) ? opt([cur, baseName(cur)]) : ''}
+    ${mine.length ? `<optgroup label="Uploaded to this video">${mine.map(opt).join('')}</optgroup>` : ''}
+    ${lib.length ? `<optgroup label="Library (public folder)">${lib.map(opt).join('')}</optgroup>` : ''}</select>`;
+};
+const aNum = (name, v, {min = 0, step = 0.1, ph = ''} = {}) => `<input type="number" data-a="${name}" min="${min}" step="${step}" value="${v ?? ''}" placeholder="${esc(ph)}" />`;
+const aRange = (name, label, v) => `<label class="f"><span>${label} <b data-out="${name}">${Math.round(v * 100)}%</b></span><input type="range" min="0" max="100" step="1" data-a="${name}" value="${Math.round(v * 100)}" /></label>`;
+
+const audioCard = (slot, t) => {
+  const [title, sub] = AUDIO_SLOTS[slot];
+  const music = slot === 'music';
+  return `<div class="card"><div class="spread"><div><h3>${title}</h3><div class="muted small">${sub}</div></div><label class="chk"><input type="checkbox" data-a="${slot}.muted" ${t.muted ? 'checked' : ''} /> Mute</label></div>
+    <div class="stack" style="margin-top:14px">
+      <label class="f"><span>Sound file</span>${srcSelect(slot, t.src)}</label>
+      <div class="row">
+        <button type="button" class="btn sm" data-action="audio-upload" data-slot="${slot}">Upload new…</button>
+        <input type="file" accept="audio/*,video/*" hidden data-audio-file="${slot}" />
+        ${t.src ? `<audio class="aud-player" src="${audioUrl(t.src)}" controls preload="none"></audio><span class="muted small">${t.durationSec ? `${fmtT(t.durationSec)} long` : ''}</span>` : ''}
+      </div>
+      ${aRange(`${slot}.volume`, 'Volume', t.volume)}
+      <div class="aud-grid">
+        <label class="f"><span>Starts at (s)</span>${aNum(`${slot}.startSec`, t.startSec)}<em>on the video timeline</em></label>
+        <label class="f"><span>Play from (s)</span>${aNum(`${slot}.trimStartSec`, t.trimStartSec)}<em>skip the start of the file</em></label>
+        <label class="f"><span>Play until (s)</span>${aNum(`${slot}.trimEndSec`, t.trimEndSec, {ph: 'to the end'})}<em>cut the end of the file</em></label>
+      </div>
+      ${music ? `
+      <div class="aud-grid two">
+        <label class="f"><span>Fade in (s)</span>${aNum('music.fadeInSec', t.fadeInSec)}</label>
+        <label class="f"><span>Fade out (s)</span>${aNum('music.fadeOutSec', t.fadeOutSec)}</label>
+      </div>
+      <div class="row" style="gap:22px">
+        <label class="chk"><input type="checkbox" data-a="music.loop" ${t.loop ? 'checked' : ''} /> Loop to fill the video</label>
+        <label class="chk"><input type="checkbox" data-a="music.duck" ${t.duck ? 'checked' : ''} /> Lower under the voiceover</label>
+      </div>
+      ${aRange('music.duckLevel', 'Music level while the voice speaks', t.duckLevel)}` : ''}
+    </div></div>`;
+};
+
+const renderAudio = () => {
+  const {project: p, audio, busy, compositions} = S.cur;
+  S.audioDirty = false;
+  if (!audio) {
+    $('#tab').innerHTML = `<div class="card waiting"><h2>Audio isn't editable yet for this video</h2>
+      <p>Turn on the audio controls to swap the voiceover or music, set volumes and fades, lower the music under the voice, and trim or move either track. Look and timing stay the same. A video that plays its own sound needs one quick Claude pass first.</p>
+      <button class="btn primary lg" data-action="make-audio-editable" ${busy ? 'disabled' : ''}>Make audio editable</button></div>`;
+    return;
+  }
+  if (!S.audioLib) {
+    S.audioLib = [];
+    api('/api/audio-library').then((l) => { S.audioLib = l; if (S.tab === 'audio' && !S.audioDirty && S.cur?.audio) renderAudio(); }).catch(() => {});
+  }
+  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  $('#tab').innerHTML = `
+    ${S.voChanged === p.id ? `<div class="card spread" style="margin-bottom:16px;border:2px solid var(--gold)"><div><b>You changed the voiceover.</b><div class="muted small">The scenes were timed to the old one. Claude can re-time them to the new voiceover (the look stays the same).</div></div><button class="btn gold" data-action="resync-timing" ${busy ? 'disabled' : ''}>Re-sync timing with Claude</button></div>` : ''}
+    <div class="text-layout">
+      <form id="audioform" class="stack" autocomplete="off" onsubmit="return false">
+        ${audioCard('voiceover', audio.voiceover)}
+        ${audioCard('music', audio.music)}
+      </form>
+      <div class="text-side">
+        <div class="preview" style="height:420px"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div>
+        <div class="muted small" style="margin-top:8px">Save, then press play in the preview to hear the mix. The same settings go into the next render.</div>
+      </div>
+    </div>
+    <div class="sticky-bar">
+      <div class="small muted" id="audio-state">Change anything, then save. A new voiceover does not move the scenes by itself.</div>
+      <button class="btn primary lg" data-action="save-audio" id="save-audio" disabled>Save audio</button>
+    </div>`;
+};
+// current form values, shaped like audio.json (volumes are 0..1)
+const readAudioForm = () => {
+  const out = {voiceover: {}, music: {}};
+  document.querySelectorAll('#audioform [data-a]').forEach((el) => {
+    const [slot, key] = el.dataset.a.split('.');
+    out[slot][key] = el.type === 'checkbox' ? el.checked
+      : el.type === 'range' ? Number(el.value) / 100
+      : el.type === 'number' ? (el.value === '' ? (key === 'trimEndSec' ? null : 0) : Number(el.value))
+      : key === 'src' ? (el.value || null) : el.value;
+  });
+  return out;
+};
+const saveAudio = async (form, {voChanged} = {}) => {
+  const id = S.cur.project.id;
+  const before = S.cur.audio?.voiceover?.src ?? null;
+  S.cur.audio = await api(`/api/projects/${id}/audio`, {method: 'PUT', body: {audio: form}});
+  if (voChanged || (S.cur.audio.voiceover?.src ?? null) !== before) S.voChanged = id;
+  renderAudio();
+};
+
+// ---------- background: ask Claude to add animated objects behind the scenes ----------
+const BG_KINDS = [['icons', 'Glossy 3D icons', 'brand-style icons floating by'], ['sparkles', 'Sparkles & particles', 'soft glints and dust'], ['blobs', 'Gradient blobs', 'blurred colour that drifts'], ['shapes', 'Floating shapes', 'rings, pills, rounded shapes'], ['grid', 'Moving grid', 'slow dotted or line pattern']];
+// ---------- style: palette colours in style.json, saved as you pick ----------
+const renderStyle = () => {
+  const {project: p, style, busy, compositions} = S.cur;
+  if (!style) {
+    $('#tab').innerHTML = `<div class="card waiting"><h2>Colours aren't editable yet for this video</h2>
+      <p>Claude can move the main palette colours into one file. After that you pick colours here and see them in the preview, with no Claude run. Look and timing stay the same.</p>
+      <button class="btn primary lg" data-action="make-style-editable" ${busy ? 'disabled' : ''}>Make colours editable</button></div>`;
+    return;
+  }
+  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const changed = Object.keys(style.colors).some((k) => style.colors[k] !== style._defaults?.[k]);
+  $('#tab').innerHTML = `
+    <div class="text-layout">
+      <div class="stack">
+        <div class="card"><div class="spread"><div><h3>Brand colours</h3><div class="muted small">Changes save as you pick and show in the preview. Soft tints and shadows follow only partly; Claude can re-tune them.</div></div>
+          <button class="btn sm ghost" data-action="reset-style" ${changed ? '' : 'disabled'}>Reset colours</button></div>
+          <div class="stack" id="styleform" style="margin-top:14px">${Object.entries(style.colors).map(([k, v]) => `
+            <div class="row" style="gap:12px;flex-wrap:nowrap"><input type="color" data-sc="${k}" value="${esc(v)}" style="width:54px;height:40px;padding:2px;flex:none" />
+              <div style="flex:1;min-width:0"><b>${esc(style._labels?.[k] ?? k)}</b><div class="muted small"><span data-sout="${k}">${esc(v)}</span>${style._defaults?.[k] && style._defaults[k] !== v ? ` · was ${esc(style._defaults[k])}` : ''}</div></div></div>`).join('')}
+          </div>
+        </div>
+        <div class="card"><h3>Logo, fonts, captions</h3>
+          <div class="muted small" style="margin:4px 0 12px">These need design changes in the video, so Claude does them. Describe what you want.</div>
+          <textarea id="style-request" rows="2" placeholder="e.g. use the white version of the logo on dark scenes, bolder headline font, add word-by-word captions"></textarea>
+          <div style="margin-top:10px"><button class="btn primary" data-action="style-request" ${busy ? 'disabled' : ''}>Ask Claude</button></div>
+        </div>
+      </div>
+      <div class="text-side">
+        <div class="preview" style="height:420px"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div>
+        <div class="muted small" style="margin-top:8px">The preview reloads by itself a moment after each change.</div>
+      </div>
+    </div>`;
+};
+
+// live controls of an existing background layer (background.json): saved straight away, no Claude run
+const bgControls = (b) => `<div class="card" id="bgctl"><div class="spread"><div><h3>Background controls</h3><div class="muted small">Changes save as you go and show in the preview.</div></div>
+  <label class="chk"><input type="checkbox" data-bgs="enabled" ${b.enabled !== false ? 'checked' : ''} /> Show objects</label></div>
+  <div class="aud-grid two" style="margin-top:14px">
+    <label class="f"><span>Amount <b data-bgout="opacity">${Math.round((b.opacity ?? 1) * 100)}%</b></span><input type="range" min="0" max="150" step="5" data-bgs="opacity" value="${Math.round((b.opacity ?? 1) * 100)}" /></label>
+    <label class="f"><span>Speed <b data-bgout="speed">${Math.round((b.speed ?? 1) * 100)}%</b></span><input type="range" min="10" max="400" step="10" data-bgs="speed" value="${Math.round((b.speed ?? 1) * 100)}" /></label>
+  </div></div>`;
+const renderBackground = () => {
+  const {project: p, busy, compositions} = S.cur;
+  const f = S.bgForm ??= {objects: ['icons', 'sparkles'], custom: '', placement: 'behind', intensity: 'subtle', colors: '', scenes: ''};
+  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  $('#tab').innerHTML = `
+    <div class="text-layout">
+      <div class="stack">
+      ${S.cur.background ? bgControls(S.cur.background) : ''}
+      <form id="bgform" class="stack" autocomplete="off" onsubmit="return false">
+        <div class="card"><h3>${S.cur.background ? 'Change or add objects' : 'Animated background objects'}</h3>
+          <div class="muted small" style="margin:4px 0 14px">For a video whose background is flat or still. Claude adds the objects as a separate layer behind your scenes. Text, timing and sound stay the same. If a scene already has a moving background, Claude leaves it alone and tells you.</div>
+          <div class="stack">
+            <div><div class="small" style="font-weight:600;color:var(--slate);margin-bottom:8px">What should float and move?</div>
+              <div class="row" style="gap:14px 22px">${BG_KINDS.map(([k, l, h]) => `<label class="chk" title="${esc(h)}"><input type="checkbox" data-bg="objects" value="${k}" ${f.objects.includes(k) ? 'checked' : ''} /> ${l}</label>`).join('')}</div></div>
+            <label class="f"><span>Or describe your own</span><textarea rows="2" data-bg="custom" placeholder="e.g. floating chat bubbles and rupee coins, tiny QR codes drifting up">${esc(f.custom)}</textarea></label>
+            <div class="aud-grid two">
+              <label class="f"><span>Where</span><select data-bg="placement"><option value="behind" ${f.placement === 'behind' ? 'selected' : ''}>Behind everything</option><option value="edges" ${f.placement === 'edges' ? 'selected' : ''}>Only around the edges, clear of content</option></select></label>
+              <label class="f"><span>Intensity</span><select data-bg="intensity">${[['subtle', 'Subtle: barely noticed'], ['medium', 'Medium: clearly alive'], ['lively', 'Lively: energetic']].map(([k, l]) => `<option value="${k}" ${f.intensity === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+            </div>
+            <div class="aud-grid two">
+              <label class="f"><span>Colours</span><input data-bg="colors" value="${esc(f.colors)}" placeholder="brand colours (default) or e.g. gold and blue" /></label>
+              <label class="f"><span>Scenes</span><input data-bg="scenes" value="${esc(f.scenes)}" placeholder="all scenes (default) or e.g. Hook, CTA" /></label>
+            </div>
+          </div>
+        </div>
+      </form>
+      </div>
+      <div class="text-side">
+        <div class="preview" style="height:420px"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div>
+        <div class="muted small" style="margin-top:8px">The preview updates as Claude works. Ask for tweaks in the chat panel, e.g. “slower, fewer objects”.</div>
+      </div>
+    </div>
+    <div class="sticky-bar">
+      <div class="small muted">${busy ? '<i class="dot"></i> Claude is working on this video…' : 'Claude will check the scenes, add the layer, and render check frames to review.'}</div>
+      <button class="btn primary lg" data-action="add-background" ${busy ? 'disabled' : ''}>Add background objects</button>
+    </div>`;
+};
+const readBgForm = () => {
+  const f = {objects: [], custom: '', placement: 'behind', intensity: 'subtle', colors: '', scenes: ''};
+  document.querySelectorAll('#bgform [data-bg]').forEach((el) => { if (el.dataset.bg === 'objects') { if (el.checked) f.objects.push(el.value); } else f[el.dataset.bg] = el.value; });
+  return f;
+};
+
 // ---------- 4 · preview & render ----------
 const renderRender = () => {
   const {project: p, compositions, busy} = S.cur;
@@ -492,7 +681,7 @@ const refresh = (full = true) => {
     if (!S.cur) { if (!route().id) renderHome(); return; }
     await loadProject(S.cur.project.id).catch(() => {});
     if (!full) return renderChat();
-    const editing = (S.tab === 'brief' && document.activeElement?.closest?.('#brief')) || (S.tab === 'text' && S.textDirty);
+    const editing = (S.tab === 'brief' && document.activeElement?.closest?.('#brief')) || (S.tab === 'text' && S.textDirty) || (S.tab === 'audio' && S.audioDirty) || (S.tab === 'background' && document.activeElement?.closest?.('#bgform')) || (S.tab === 'style' && document.activeElement?.closest?.('#style-request, #styleform'));
     if (editing) { renderAssets(); } else { renderProject(); }
     renderChat();
   }, 250);
@@ -614,6 +803,35 @@ document.addEventListener('click', async (ev) => {
         toast('Text saved.');
         break;
       }
+      case 'make-audio-editable': {
+        const r = await api(`/api/projects/${id}/make-audio-editable`, {method: 'POST'});
+        if (r.agent) { toast('Claude is moving the audio into an editable file…'); break; }
+        S.cur.audio = r.audio; renderAudio(); toast('Audio controls are on.');
+        break;
+      }
+      case 'audio-upload': document.querySelector(`[data-audio-file="${a.dataset.slot}"]`)?.click(); break;
+      case 'save-audio': await saveAudio(readAudioForm()); toast('Audio saved. Press play in the preview to hear it.'); break;
+      case 'resync-timing': {
+        const vo = S.cur.audio?.voiceover?.src;
+        await api(`/api/projects/${id}/message`, {method: 'POST', body: {text: `I replaced the voiceover with ${vo ? baseName(vo) : 'a new file'} (see audio.json; it is transcribed in the project's transcripts folder, or transcribe it if not). Re-time the video to it: update the scene starts and cues in config.ts and the storyboard so each scene lands on its sentence, keep the look, and re-render the check stills. Do not touch audio.json.`}});
+        S.voChanged = null; renderAudio(); toast('Claude is re-timing the video…');
+        break;
+      }
+      case 'make-style-editable': await api(`/api/projects/${id}/make-style-editable`, {method: 'POST'}); toast('Claude is moving the colours into an editable file…'); break;
+      case 'reset-style': S.cur.style = await api(`/api/projects/${id}/style`, {method: 'PUT', body: {reset: true}}); renderStyle(); toast('Colours reset.'); break;
+      case 'style-request': {
+        const text = $('#style-request').value.trim();
+        if (!text) return toast('Write what to change first.');
+        await api(`/api/projects/${id}/message`, {method: 'POST', body: {text: `Style change for the built video: ${text}. Keep the colours in style.json, the text, timing and audio as they are unless I say otherwise; re-render a few check stills and look at them.`}});
+        $('#style-request').value = ''; toast('Sent to Claude.');
+        break;
+      }
+      case 'add-background': {
+        S.bgForm = readBgForm();
+        await api(`/api/projects/${id}/background`, {method: 'POST', body: S.bgForm});
+        toast('Claude is adding the background objects…');
+        break;
+      }
       case 'refresh-checks': await api(`/api/projects/${id}/checks`, {method: 'POST'}); toast('Re-rendering check frames…'); break;
       case 'save-preset': await api(`/api/projects/${id}/save-preset`, {method: 'POST', body: {name: $('#preset-name').value}}); toast('Claude is writing the preset…'); break;
     }
@@ -628,6 +846,16 @@ document.addEventListener('input', (ev) => {
     S.textDirty = [...document.querySelectorAll('#textform [data-path]')].some((el) => el.value !== el.dataset.orig);
     $('#save-text').disabled = !S.textDirty;
     $('#text-state').textContent = S.textDirty ? 'Unsaved changes.' : 'No changes.';
+    return;
+  }
+  if (t.dataset.sc) { const o = document.querySelector(`[data-sout="${t.dataset.sc}"]`); if (o) o.textContent = t.value.toUpperCase(); return; }
+  if (t.closest('#bgctl')) { if (t.type === 'range') { const o = document.querySelector(`[data-bgout="${t.dataset.bgs}"]`); if (o) o.textContent = `${t.value}%`; } return; }
+  if (t.closest('#bgform')) { S.bgForm = readBgForm(); S.bgDirty = true; return; }
+  if (t.closest('#audioform')) {
+    if (t.type === 'range') { const o = document.querySelector(`[data-out="${t.dataset.a}"]`); if (o) o.textContent = `${t.value}%`; }
+    S.audioDirty = true;
+    $('#save-audio').disabled = false;
+    $('#audio-state').textContent = 'Unsaved changes.';
     return;
   }
   if (!t.closest('#brief') || !t.name) return;
@@ -645,6 +873,31 @@ document.addEventListener('change', async (ev) => {
     if (t.name === 'presetId') { await flushSave(); S.cur.project = await api(`/api/projects/${S.cur.project.id}`, {method: 'PATCH', body: {presetId: t.value}}); renderProject(); return; }
     if (t.name === 'brandId' || t.name === 'width' || t.name === 'height') { await flushSave(); renderBrief(); }
     if (t.id === 'file') uploadFiles([...t.files]);
+    if (t.dataset.sc) {
+      const colors = Object.fromEntries([...document.querySelectorAll('#styleform [data-sc]')].map((el) => [el.dataset.sc, el.value]));
+      S.cur.style = await api(`/api/projects/${S.cur.project.id}/style`, {method: 'PUT', body: {colors}});
+      renderStyle();
+      return;
+    }
+    if (t.closest('#bgctl') && t.dataset.bgs) {
+      const val = (k) => document.querySelector(`#bgctl [data-bgs="${k}"]`);
+      S.cur.background = await api(`/api/projects/${S.cur.project.id}/background-settings`, {method: 'PUT', body: {enabled: val('enabled').checked, opacity: Number(val('opacity').value) / 100, speed: Number(val('speed').value) / 100}});
+      return;
+    }
+    if (t.closest('#audioform') && t.dataset.a) { S.audioDirty = true; $('#save-audio').disabled = false; $('#audio-state').textContent = 'Unsaved changes.'; }
+    if (t.dataset.audioFile) {
+      const slot = t.dataset.audioFile, f = t.files[0];
+      if (!f) return;
+      const form = readAudioForm(), id = S.cur.project.id;
+      const fd = new FormData(); fd.append('role', slot); fd.append('files', f);
+      toast(`Uploading ${f.name}…`, 60000);
+      const assets = await api(`/api/projects/${id}/assets`, {method: 'POST', body: fd});
+      form[slot].src = `studio/${id}/${assets.at(-1).file}`;
+      form[slot].trimStartSec = 0; form[slot].trimEndSec = null;
+      await loadProject(id);
+      await saveAudio(form, {voChanged: slot === 'voiceover'});
+      toast(slot === 'voiceover' ? 'New voiceover set. Re-sync the timing when you are ready.' : 'Music set and saved.');
+    }
   } catch (e) { toast(e.message); }
 });
 

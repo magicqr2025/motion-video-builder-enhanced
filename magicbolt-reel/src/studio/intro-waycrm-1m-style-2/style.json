@@ -1,0 +1,26 @@
+{
+  "colors": {
+    "NAVY": "#0E1B4D",
+    "DEEP": "#1354BC",
+    "BLUE": "#1582D5",
+    "GOLD": "#FDC60B",
+    "ORANGE": "#F7941D",
+    "SLATE": "#5A6488"
+  },
+  "_defaults": {
+    "NAVY": "#0E1B4D",
+    "DEEP": "#1354BC",
+    "BLUE": "#1582D5",
+    "GOLD": "#FDC60B",
+    "ORANGE": "#F7941D",
+    "SLATE": "#5A6488"
+  },
+  "_labels": {
+    "NAVY": "Headlines & dark text",
+    "DEEP": "Deep blue (buttons, accents)",
+    "BLUE": "Bright blue",
+    "GOLD": "Gold highlights",
+    "ORANGE": "Orange accents",
+    "SLATE": "Muted text"
+  }
+}
