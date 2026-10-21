@@ -77,7 +77,7 @@ const toolLabel = (name, i = {}) => {
   }
 };
 
-const runCodexTurn = ({project, prompt, model, signal, onText, onTool}) => new Promise((resolve, reject) => {
+const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool}) => new Promise((resolve, reject) => {
   // A Codex thread keeps its original writable roots when resumed. Start a fresh
   // thread once so projects created before this workspace layout gain their data dir.
   if (project.codexWorkspaceVersion !== 2) {
@@ -105,8 +105,13 @@ const runCodexTurn = ({project, prompt, model, signal, onText, onTool}) => new P
     }
     const item = e.item ?? {};
     if (item.type === 'agent_message' && item.text) onText(item.text);
-    else if (item.type === 'command_execution') onTool('Bash', {command: item.command, description: item.command});
+    else if (item.type === 'command_execution') {
+      onTool('Bash', {command: item.command, description: item.command});
+      if (item.status === 'failed') onStatus(item.aggregated_output || `Command failed before it started (exit ${item.exit_code ?? 'unknown'}).`);
+    }
     else if (item.type === 'file_change') onTool('Edit', {file_path: item.changes?.[0]?.path ?? 'project files'});
+    else if (item.type === 'error' && item.message) onStatus(item.message);
+    if (e.type === 'error' && e.message) onStatus(e.message);
     if (e.type === 'turn.failed') resultError = e.error?.message ?? JSON.stringify(e.error ?? e);
   };
   child.stdout.on('data', (chunk) => {
@@ -145,6 +150,7 @@ export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) =>
       const r = await runCodexTurn({
         project: p, prompt, model: cfg.model, signal: ac.signal,
         onText: (text) => send({kind: 'text', text}),
+        onStatus: (text) => send({kind: 'text', text}),
         onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
       });
       ok = r.ok;

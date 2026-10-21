@@ -94,13 +94,17 @@ label.f > em { display: block; font-style: normal; font-size: 11px; color: var(-
 .preset .body p { margin: 0; font-size: 12px; color: var(--slate); line-height: 1.5; flex: 1; }
 
 /* ---------- tabs ---------- */
-.tabs { display: flex; gap: 6px; margin: 18px 0 22px; padding: 5px; background: #fff; border-radius: 14px; box-shadow: var(--shadow); width: fit-content; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 22px; padding: 5px; background: #fff; border-radius: 14px; box-shadow: var(--shadow); width: fit-content; max-width: 100%; }
 .tabs button { font: inherit; font-weight: 600; font-size: 13px; border: 0; background: transparent; padding: 9px 16px; border-radius: 10px; color: var(--slate); cursor: pointer; display: flex; gap: 8px; align-items: center; }
 .tabs button .k { width: 20px; height: 20px; border-radius: 6px; background: var(--soft); display: grid; place-items: center; font-size: 11px; }
 .tabs button.on { background: var(--navy); color: #fff; }
 .tabs button.on .k { background: var(--gold); color: var(--navy); }
 .tabs button:disabled { opacity: .4; cursor: not-allowed; }
 .tabs button.done .k { background: #E2F6E9; color: var(--green); }
+.planner-frames { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; max-height:440px; overflow:auto; margin-top:10px; padding:2px; }
+.planner-frame { border:1px solid var(--line); border-radius:10px; padding:6px; background:#fff; }
+.planner-frame img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; border-radius:6px; background:var(--soft); }
+.planner-frame .spread { align-items:center; margin-top:5px; }
 
 /* ---------- brief ---------- */
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }

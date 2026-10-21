@@ -14,6 +14,7 @@ import {renderStills, renderVideo, probe, extractReference, startRemotionStudio,
 import {transcribeFile} from './transcribe.mjs';
 import {readSettings, writeSettings, publicSettings, updateAi, aiConfig} from './settings.mjs';
 import {pingModel} from './providers/openai.mjs';
+import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges, lookChangePrompt} from './look.mjs';
 
 const PORT = Number(process.env.PORT ?? 4321);
 const app = express();
@@ -21,6 +22,7 @@ app.use(express.json({limit: '2mb'}));
 
 // ---------- live events (server-sent) ----------
 const clients = new Set();
+const scriptPlanJobs = new Map();
 const broadcast = (e) => { const s = `data: ${JSON.stringify(e)}\n\n`; for (const res of clients) res.write(s); };
 app.get('/api/events', (req, res) => {
   res.set({'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive'});
@@ -39,6 +41,11 @@ const busyGuard = (id) => { if (isBusy(id)) throw Object.assign(new Error('Claud
 const safeName = (s) => s.normalize('NFKD').replace(/[^\w.\- ]+/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').slice(-80) || `file-${Date.now()}`;
 const kindOf = (mime, name) => (/^audio\//.test(mime) || /\.(mp3|wav|m4a|aac|ogg)$/i.test(name) ? 'audio' : /^video\//.test(mime) || /\.(mp4|mov|webm|mkv)$/i.test(name) ? 'video' : /^image\//.test(mime) ? 'image' : 'other');
 const defaultRole = (kind, name) => (kind === 'audio' ? (/music|bgm|track/i.test(name) ? 'music' : 'voiceover') : kind === 'video' ? 'reference' : kind === 'image' ? (/logo/i.test(name) ? 'logo' : 'image') : 'file');
+const referenceFrames = (p) => Object.fromEntries(p.assets.filter((a) => a.kind === 'video' && a.refDir).map((a) => {
+  const dir = path.join(projectDir(p.id), a.refDir);
+  const frames = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^f-\d+\.\d+s\.jpg$/i.test(f)).sort() : [];
+  return [a.file, frames];
+}));
 
 // background media jobs: reference frames and voiceover transcripts, one at a time
 let mediaQueue = Promise.resolve();
@@ -71,7 +78,7 @@ const processAssetNow = async (id, file) => {
 
 // ---------- state ----------
 app.get('/api/state', wrap(async (req, res) => {
-  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: publicSettings()});
+  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: publicSettings(), lookSpec: LOOK_SPEC});
 }));
 
 app.post('/api/projects', wrap(async (req, res) => {
@@ -82,7 +89,8 @@ app.post('/api/projects', wrap(async (req, res) => {
 
 app.get('/api/projects/:id', wrap(async (req, res) => {
   const p = need(req.params.id);
-  res.json({project: p, concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), audio: await fillDurations(p.id), background: readBackground(p.id), style: readStyle(p.id), log: readLog(p.id).slice(-400), busy: isBusy(p.id),
+  syncLook(p);
+  res.json({project: p, referenceFrames: referenceFrames(p), concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), audio: await fillDurations(p.id), background: readBackground(p.id), style: readStyle(p.id), log: readLog(p.id).slice(-400), busy: isBusy(p.id),
     compositions: {video: compId(p.id), concepts: conceptsCompId(p.id)}, renderJob: renderJob?.projectId === p.id ? renderJob : null});
 }));
 
@@ -123,6 +131,108 @@ app.post('/api/projects/:id/assets', upload.array('files', 30), wrap(async (req,
   res.json(p.assets);
 }));
 
+// Script planning analyzes reference frames in small batches and streams progress to the browser.
+app.post('/api/projects/:id/script-plan', wrap(async (req, res) => {
+  const p = need(req.params.id), cfg = aiConfig();
+  if (scriptPlanJobs.has(p.id)) throw Object.assign(new Error('Script analysis is already running for this project.'), {status: 409});
+  if (isBusy(p.id)) throw Object.assign(new Error('Wait for the current AI task on this project to finish first.'), {status: 409});
+  if (!['claude', 'codex'].includes(cfg.provider) && (!cfg.baseUrl || !cfg.model)) throw Object.assign(new Error('Choose and configure an AI model first.'), {status: 400});
+  const brief = req.body.brief ?? {}, refs = (brief.plannerRefs ?? []).map((name) => p.assets.find((a) => a.file === name && a.kind === 'video')).filter(Boolean);
+  const waiting = refs.find((a) => !a.refDir && a.job);
+  if (waiting) throw Object.assign(new Error(`Sample video “${waiting.original}” is still being prepared. Try again when its frames are ready.`), {status: 409});
+  const job = {controller: new AbortController(), providerAgent: ['claude', 'codex'].includes(cfg.provider)};
+  scriptPlanJobs.set(p.id, job);
+  const progress = (stage, message, completed = 0, total = 0) => broadcast({type: 'planner', projectId: p.id, stage, message, completed, total});
+  try {
+  // Refresh older cached references that were sampled less densely before the 0.5s setting.
+  for (const a of refs) {
+    if (!a.refDir) continue;
+    const dir = path.join(projectDir(p.id), a.refDir), readme = path.join(dir, 'README.txt');
+    const manifest = fs.existsSync(readme) ? fs.readFileSync(readme, 'utf8') : '';
+    if (!manifest.includes('sampled every 1 s; identical frames removed')) {
+      progress('extracting', `Refreshing one-second snapshots for ${a.original}…`);
+      a.info = await extractReference(path.join(projectAssets(p.id), a.file), dir);
+      saveProject(p);
+    }
+  }
+  const task = `You are a creative video script partner. ${req.body.action === 'coach' ? 'Give concise guidance and an improved script direction.' : 'Create or improve the script.'} Return only valid JSON with keys plannerScript and plannerAnalysis. Preserve supplied facts and claims; do not invent product details. Use the user's idea or draft as the source; it may include audience, goal, tone, length and must-have details. If key facts are missing, mention questions briefly in plannerAnalysis. Make the script speakable, concise and organized with one beat per line. Reference frame images are inspiration for pacing, framing, palette and mood; do not copy exact content.\nExisting brief context: ${JSON.stringify({idea: brief.idea, audience: brief.audience, style: brief.style, targetLengthSeconds: brief.durationSec, notes: brief.notes})}\nUser's idea or draft: ${brief.plannerScript || ''}\nSelected sample videos: ${refs.map((a) => a.original).join(', ') || 'none'}`;
+  const imageMime = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'};
+  const frames = refs.flatMap((a) => {
+    if (!a.refDir) return [];
+    const dir = path.join(projectDir(p.id), a.refDir);
+    return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => imageMime[path.extname(f).toLowerCase()]).sort().map((file) => ({asset: a, file, full: path.join(dir, file)})) : [];
+  });
+  const summaries = [];
+  const batchSize = 8;
+  let answer = '';
+  if (['claude', 'codex'].includes(cfg.provider)) {
+    const agentTurn = async (prompt, label) => {
+      const texts = []; let failure = '';
+      const ok = await runAgent(p.id, prompt, {label, emit: (event) => {
+        if (event.kind === 'status' || event.kind === 'done') return;
+        broadcast(event);
+        if (event.kind === 'text') texts.push(event.text);
+        if (event.kind === 'error') failure = event.text;
+      }});
+      if (!ok) throw new Error(failure || 'The selected AI connection could not complete script planning.');
+      return texts.join('\n').trim();
+    };
+    for (let start = 0; start < frames.length; start += batchSize) {
+      if (job.controller.signal.aborted) throw new Error('Script analysis cancelled.');
+      const batch = frames.slice(start, start + batchSize), n = Math.floor(start / batchSize) + 1, total = Math.ceil(frames.length / batchSize);
+      progress('frames', `Reviewing frame batch ${n} of ${total}…`, start, frames.length);
+      const prompt = `Review these reference frames visually using the Read tool. Every listed frame was sampled from the video at 1 second intervals. Summarize only useful visual direction: pacing, shot types, palette, typography, transitions and tone. Do not copy text or claim facts from the sample. Do not edit files. Reply in 4 concise bullets.\n${batch.map((f) => `- ${f.full}`).join('\n')}`;
+      summaries.push(await agentTurn(prompt, `Analyze sample frames ${n}/${total}`));
+      progress('frames', `Reviewed ${Math.min(start + batch.length, frames.length)} of ${frames.length} frames.`, Math.min(start + batch.length, frames.length), frames.length);
+    }
+    progress('script', 'Writing the improved script…', frames.length, frames.length);
+    const finalPrompt = `${task}\nVisual direction from the selected sample, analyzed in one-second frame batches:\n${summaries.join('\n\n')}\nDo not call tools. Reply with only the requested JSON.`;
+    answer = await agentTurn(finalPrompt, req.body.action === 'coach' ? 'Improve script' : 'Generate script');
+  } else {
+    const headers = {'Content-Type': 'application/json', ...(cfg.apiKey ? {Authorization: `Bearer ${cfg.apiKey}`} : {})};
+    const modelCall = async (messages, json = false) => {
+      const response = await fetch(`${cfg.baseUrl}/chat/completions`, {method: 'POST', headers, signal: job.controller.signal, body: JSON.stringify({model: cfg.model, messages, ...(json ? {response_format: {type: 'json_object'}} : {})})});
+      if (!response.ok) throw new Error(`${cfg.model} answered ${response.status}: ${(await response.text()).slice(0, 500)}`);
+      return (await response.json()).choices?.[0]?.message?.content ?? '';
+    };
+    for (let start = 0; start < frames.length; start += batchSize) {
+      if (job.controller.signal.aborted) throw new Error('Script analysis cancelled.');
+      const batch = frames.slice(start, start + batchSize), n = Math.floor(start / batchSize) + 1, total = Math.ceil(frames.length / batchSize);
+      progress('frames', `Analyzing frame batch ${n} of ${total}…`, start, frames.length);
+      const content = [{type: 'text', text: `Analyze these sample-video frames for visual inspiration only. They are ordered and sampled every 1 second. Briefly summarize pacing, framing, colors, typography, transitions and mood. Do not transcribe every frame or infer product claims.`}];
+      for (const f of batch) content.push({type: 'text', text: `${f.asset.original}, at ${f.file.match(/f-(\d+\.\d+)s/)?.[1] || '?'} sec`}, {type: 'image_url', image_url: {url: `data:${imageMime[path.extname(f.file).toLowerCase()]};base64,${fs.readFileSync(f.full).toString('base64')}`}});
+      summaries.push(await modelCall([{role: 'user', content}]));
+      progress('frames', `Analyzed ${Math.min(start + batch.length, frames.length)} of ${frames.length} frames.`, Math.min(start + batch.length, frames.length), frames.length);
+    }
+    progress('script', 'Writing the improved script…', frames.length, frames.length);
+    answer = await modelCall([{role: 'user', content: `${task}\nVisual direction summarized from one-second frame batches:\n${summaries.join('\n\n')}`}], true);
+  }
+  if (!answer) throw new Error('The selected model returned an empty script plan.');
+  let result;
+  try { result = JSON.parse(answer); } catch { const match = answer.match(/\{[\s\S]*\}/); if (!match) throw new Error('The selected model did not return a structured plan.'); result = JSON.parse(match[0]); }
+  const next = {...p.brief};
+  if (typeof result.plannerScript === 'string' && next.plannerScript?.trim() && result.plannerScript.trim() !== next.plannerScript.trim()) {
+    next.plannerVersions = [{text: next.plannerScript, savedAt: Date.now()}, ...(next.plannerVersions ?? [])].slice(0, 10);
+  }
+  for (const k of ['plannerScript', 'plannerAnalysis']) if (typeof result[k] === 'string') next[k] = result[k];
+  next.plannerRefs = brief.plannerRefs ?? [];
+  p.brief = next; saveProject(p); changed(p.id);
+  progress('done', 'Script plan ready.', frames.length, frames.length);
+  res.json({brief: next});
+  } catch (error) {
+    progress(job.controller.signal.aborted ? 'cancelled' : 'error', job.controller.signal.aborted ? 'Analysis cancelled.' : String(error.message ?? error));
+    throw error;
+  } finally { scriptPlanJobs.delete(p.id); }
+}));
+
+app.post('/api/projects/:id/script-plan/cancel', wrap(async (req, res) => {
+  const job = scriptPlanJobs.get(req.params.id);
+  if (!job) return res.json({ok: true, running: false});
+  job.controller.abort();
+  if (job.providerAgent) stopAgent(req.params.id);
+  res.json({ok: true, running: true});
+}));
+
 app.patch('/api/projects/:id/assets/:file', wrap(async (req, res) => {
   const p = need(req.params.id);
   const a = p.assets.find((x) => x.file === req.params.file);
@@ -143,6 +253,16 @@ app.delete('/api/projects/:id/assets/:file', wrap(async (req, res) => {
   res.json({ok: true});
 }));
 
+app.delete('/api/projects/:id/reference-frames/:file/:frame', wrap(async (req, res) => {
+  const p = need(req.params.id), asset = p.assets.find((a) => a.file === req.params.file && a.kind === 'video' && a.refDir);
+  if (!asset || !/^f-\d+\.\d+s\.jpg$/i.test(req.params.frame)) throw Object.assign(new Error('No such reference frame'), {status: 404});
+  const dir = path.resolve(projectDir(p.id), asset.refDir), target = path.resolve(dir, req.params.frame);
+  if (!target.startsWith(`${dir}${path.sep}`) || !fs.existsSync(target)) throw Object.assign(new Error('No such reference frame'), {status: 404});
+  fs.rmSync(target);
+  changed(p.id);
+  res.json({frames: referenceFrames(p)[asset.file] ?? []});
+}));
+
 // ---------- agent phases ----------
 const startTurn = (p, prompt, label, {before, after} = {}) => {
   busyGuard(p.id);
@@ -151,6 +271,7 @@ const startTurn = (p, prompt, label, {before, after} = {}) => {
   if (p.textEdited) prompt = `${textEditedNote(p)}\n\n${prompt}`;
   if (p.audioEdited) prompt = `${audioEditedNote(p)}\n\n${prompt}`;
   if (p.styleEdited) prompt = `${styleEditedNote(p)}\n\n${prompt}`;
+  syncLook(p);
   p.briefDirty = false; p.textEdited = false; p.audioEdited = false; p.styleEdited = false; saveProject(p);
   changed(p.id); broadcast({type: 'projects'});
   runAgent(p.id, prompt, {
@@ -174,7 +295,7 @@ app.post('/api/projects/:id/approve', wrap(async (req, res) => {
   const {conceptId, notes = ''} = req.body;
   const c = readConcepts(p.id)?.concepts?.find((x) => x.id === conceptId);
   startTurn(p, buildPrompt(p, conceptId, notes), `Approved concept ${c?.name ? `"${c.name}"` : conceptId}${notes ? `: ${notes}` : ''}. Build the full video.`, {
-    before: {status: 'building', approvedConcept: {id: conceptId, name: c?.name ?? conceptId, notes}},
+    before: {status: 'building', approvedConcept: {id: conceptId, name: c?.name ?? conceptId, notes}, ...(p.look ? {look: {...p.look, applied: {levels: builtLevels(p.look)}}} : {})},
     after: (q) => { q.status = readStoryboard(q.id) ? 'review' : 'concepts'; },
   });
   res.json({ok: true});
@@ -333,6 +454,41 @@ app.post('/api/projects/:id/background', wrap(async (req, res) => {
   startTurn(p, backgroundPrompt(p, o), `Add animated background objects (${what}), ${o.intensity}${o.scenes ? `, scenes: ${o.scenes}` : ''}`);
   res.json({ok: true});
 }));
+// ---------- look & feel: chosen before the concepts (project.look), layer part mirrored to src/studio/<id>/look.json ----------
+const lookFile = (id) => path.join(projectCode(id), 'look.json');
+// keep look.json (finishing layer: grain, grade, leaks, motion blur, sfx + scene starts) in step with project.look and the storyboard
+const syncLook = (p) => {
+  if (!p.look) return;
+  const starts = (readStoryboard(p.id)?.scenes ?? []).map((s) => Number(s.start)).filter(Number.isFinite);
+  const next = JSON.stringify(layerFile(p.look, starts), null, 2) + '\n';
+  const had = fs.existsSync(lookFile(p.id));
+  if (had && fs.readFileSync(lookFile(p.id), 'utf8') === next) return;
+  fs.mkdirSync(projectCode(p.id), {recursive: true});
+  fs.writeFileSync(lookFile(p.id), next);
+  if (!had) writeRegistry();
+};
+app.put('/api/projects/:id/look', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const edit = req.body.look ?? {};
+  if (edit.bundle && !edit.levels) edit.levels = bundleLevels(edit.bundle);
+  p.look = cleanLook(edit, p.look ?? {});
+  if (p.sessionId) p.briefDirty = true;
+  saveProject(p);
+  syncLook(p);
+  changed(p.id); broadcast({type: 'projects'});
+  res.json({look: p.look, changes: lookChanges(p.look)});
+}));
+// after the video is built: have Claude apply the changed Claude-built options (camera, transitions, objects, actions)
+app.post('/api/projects/:id/look/apply', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const changes = lookChanges(p.look);
+  if (!changes.length) return res.json({ok: true, none: true});
+  startTurn(p, lookChangePrompt(p.look, changes, compId(p.id)), `Apply look changes: ${changes.map((c) => c.key).join(', ')}`, {
+    before: {look: {...p.look, applied: {levels: builtLevels(p.look)}}},
+  });
+  res.json({ok: true});
+}));
+
 // ---------- palette: src/studio/<id>/style.json {colors, _defaults, _labels}, edited from the Style tab ----------
 const styleFile = (id) => path.join(projectCode(id), 'style.json');
 const readStyle = (id) => { try { return JSON.parse(fs.readFileSync(styleFile(id), 'utf8')); } catch { return null; } };
@@ -484,7 +640,8 @@ app.post('/api/projects/:id/render', wrap(async (req, res) => {
   res.json(renderJob);
   let last = 0;
   try {
-    const info = await renderVideo({composition: compId(p.id), out: path.join(projectDir(p.id), rel), scale, signal: renderAbort.signal,
+    syncLook(p);
+    const info = await renderVideo({composition: compId(p.id), out: path.join(projectDir(p.id), rel), scale, signal: renderAbort.signal, props: {lookDraft: scale < 1},
       onProgress: (e) => { Object.assign(renderJob, e); if (Date.now() - last > 400 || e.progress === 1) { last = Date.now(); broadcast({type: 'render', ...renderJob}); } }});
     const q = getProject(p.id);
     let exported = null, exportError = null;
@@ -555,6 +712,8 @@ process.on('unhandledRejection', crashed('unhandledRejection'));
 
 const server = app.listen(PORT, (err) => {
   if (err) return; // handled by the 'error' listener below (Express 5 also passes it here)
+  // built-in sound effects (*.wav is git-ignored): make them if missing
+  if (!fs.existsSync(path.join(REEL, 'public', 'sfx', 'whoosh.wav'))) import('../bin/make-sfx.mjs').catch((e) => console.error('  ! Could not create sound effects:', e.message));
   try { recoverStuck(); } catch (e) { console.error('  ! Could not check for stuck projects:', e.message); }
   console.log(`\n  MagicBolt Video Studio  ->  ${URL_}\n  Remotion Studio (live preview)  ->  http://localhost:${STUDIO_PORT}\n`);
   // Claude runs on this PC's Claude Code login only (API keys are ignored, see agent.mjs). macOS keeps it in the Keychain.

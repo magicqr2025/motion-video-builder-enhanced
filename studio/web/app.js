@@ -130,7 +130,7 @@ const renderHome = () => {
   $('#main').innerHTML = `
     <div class="hero">
       <h1>What are we making today?</h1>
-      <p>Pick a preset (a look you've already approved) or start blank. Fill the brief, Claude proposes concepts as real sample frames, you approve one, and it builds the full video with timing synced to your voiceover.</p>
+      <p>Pick a preset or start blank. Add optional sample snapshots for visual reference, complete the brief, then develop concepts and build the video.</p>
       <div class="steps"><span>1 · Brief</span><span>2 · Concept stills</span><span>3 · Approve</span><span>4 · Full build</span><span>5 · Render MP4</span></div>
     </div>
     ${aiCard()}
@@ -155,9 +155,9 @@ const renderHome = () => {
 };
 
 // ---------- project shell ----------
-const TABS = [['brief', 'Brief'], ['concepts', 'Concepts'], ['build', 'Build & timing'], ['text', 'Text'], ['style', 'Style'], ['audio', 'Audio'], ['background', 'Background'], ['render', 'Preview & render']];
-const tabEnabled = (t, p, cur) => t === 'brief' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard);
-const tabDone = (t, p) => ({brief: p.status !== 'brief', concepts: !!p.approvedConcept, build: ['review', 'rendering', 'done'].includes(p.status), text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
+const TABS = [['script', 'Reference snapshots'], ['brief', 'Brief'], ['look', 'Look & feel'], ['concepts', 'Concepts'], ['build', 'Build & timing'], ['text', 'Text'], ['style', 'Style'], ['audio', 'Audio'], ['background', 'Background'], ['render', 'Preview & render']];
+const tabEnabled = (t, p, cur) => !(S.plannerBusy && t === 'brief') && (t === 'script' || t === 'brief' || t === 'look' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard));
+const tabDone = (t, p) => ({brief: p.status !== 'brief', look: !!p.look?.reviewed, concepts: !!p.approvedConcept, build: ['review', 'rendering', 'done'].includes(p.status), text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
 
 const renderProject = () => {
   const {project: p} = S.cur;
@@ -173,7 +173,47 @@ const renderProject = () => {
     </div>
     <div class="tabs">${tabs}</div>
     <div id="tab"></div>`;
-  ({brief: renderBrief, concepts: renderConcepts, build: renderBuild, text: renderText, style: renderStyle, audio: renderAudio, background: renderBackground, render: renderRender}[S.tab] ?? renderBrief)();
+  ({script: renderScriptPlanner, brief: renderBrief, look: renderLook, concepts: renderConcepts, build: renderBuild, text: renderText, style: renderStyle, audio: renderAudio, background: renderBackground, render: renderRender}[S.tab] ?? renderBrief)();
+};
+
+const renderScriptPlanner = () => {
+  const {project: p} = S.cur;
+  const refs = p.assets.filter((a) => a.kind === 'video');
+  $('#tab').innerHTML = `<div class="hero" style="padding:22px 0 10px"><h1 style="font-size:26px">Reference snapshots</h1><p>Upload a sample video to capture one frame per second for visual reference. Snapshots are created locally; script and AI analysis are not run here.</p></div>
+    <div class="card stack">
+      <div class="spread"><div><b>Sample video</b><div class="small muted">Frames are captured locally at one-second intervals and duplicate frames are removed.</div></div><button type="button" class="btn primary" data-action="planner-upload">Upload video</button></div>
+      <input type="file" id="planner-file" accept="video/*" hidden />
+      ${refs.length ? `<div class="grid g2">${refs.map((a) => {
+        const frames = S.cur.referenceFrames?.[a.file] ?? [];
+        const frameCards = frames.map((frame) => `<div class="planner-frame"><img loading="lazy" src="/data/${encodeURIComponent(p.id)}/${a.refDir.split('/').map(encodeURIComponent).join('/')}/${encodeURIComponent(frame)}" alt="Sample frame at ${esc(frame.match(/f-(\d+\.\d+)s/)?.[1] || '')} seconds"><div class="spread"><small>${esc(frame.match(/f-(\d+\.\d+)s/)?.[1] || '')}s</small><button type="button" class="btn ghost sm danger" data-action="planner-delete-frame" data-video="${esc(a.file)}" data-frame="${esc(frame)}">Delete</button></div></div>`).join('');
+        return `<div class="card stack" style="margin:0"><div class="spread"><span><b>${esc(a.original)}</b><small class="muted" style="display:block">${a.refDir ? `${frames.length} unique snapshots - one per second` : esc(a.job || 'Preparing snapshots...')}</small></span>${a.jobError ? `<span class="pill red" title="${esc(a.jobError)}">Snapshot error</span>` : ''}</div>${frames.length ? `<details open><summary class="small">Review or remove snapshots</summary><div class="planner-frames">${frameCards}</div></details>` : ''}</div>`;
+      }).join('')}</div>` : '<div class="muted small">No sample videos yet. Upload a video to create reference snapshots.</div>'}</div>
+    <div class="sticky-bar"><span class="small muted">Snapshot capture runs locally and does not call an AI model.</span><button type="button" class="btn primary" data-tab="brief">Continue to brief</button></div>`;
+};
+
+const updatePlannerWait = () => {
+  const label = $('#planner-wait');
+  if (!label || !S.plannerStartedAt) return;
+  const elapsed = Math.floor((Date.now() - S.plannerStartedAt) / 1000);
+  const selected = S.cur?.project?.brief?.plannerRefs ?? [];
+  const frameCount = selected.reduce((n, file) => n + (S.cur?.referenceFrames?.[file]?.length || 0), 0);
+  // A deliberately broad estimate: model speed varies substantially, especially for local vision models.
+  const estimate = 30 + frameCount * 2;
+  const clock = (seconds) => `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+  const step = S.plannerAborting ? 'Cancelling analysis…' : S.plannerProgress?.message || 'Preparing analysis…';
+  const count = S.plannerProgress?.total ? ` · ${S.plannerProgress.completed || 0}/${S.plannerProgress.total} frames` : '';
+  label.textContent = elapsed < estimate
+    ? `${step}${count} · elapsed ${clock(elapsed)} · rough total ${clock(estimate)}; check back in about ${clock(estimate - elapsed)}. Timing varies by model.`
+    : `Still analyzing · elapsed ${clock(elapsed)} · the rough ${clock(estimate)} estimate has passed. Check back in about a minute.`;
+};
+const updatePlannerPreflight = () => {
+  const label = $('#planner-preflight');
+  if (!label) return;
+  const selected = S.cur?.project?.brief?.plannerRefs ?? [];
+  const count = selected.reduce((n, file) => n + (S.cur?.referenceFrames?.[file]?.length || 0), 0);
+  if (!count) { label.textContent = 'Select a sample video to include its snapshots in analysis. Script-only requests are usually quicker.'; return; }
+  const seconds = 30 + count * 2;
+  label.textContent = `${count} snapshots selected · about ${Math.ceil(count / 8)} analysis batches · rough estimate ${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s, depending on the model.`;
 };
 
 // ---------- 1 · brief ----------
@@ -238,7 +278,9 @@ const renderBrief = () => {
         <div class="small muted" id="save-state">Changes save automatically.</div>
         <div class="row">
           ${S.cur.concepts ? '<button type="button" class="btn" data-tab="concepts">View concepts</button>' : ''}
-          <button type="button" class="btn primary lg" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>${S.cur.concepts ? 'Regenerate concepts' : 'Generate concepts'} →</button>
+          ${!S.cur.concepts && !p.look?.reviewed ? `<button type="button" class="btn" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>Skip, generate concepts</button>
+          <button type="button" class="btn primary lg" data-tab="look">Next: Look &amp; feel →</button>` : `<button type="button" class="btn" data-tab="look">Look &amp; feel</button>
+          <button type="button" class="btn primary lg" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>${S.cur.concepts ? 'Regenerate concepts' : 'Generate concepts'} →</button>`}
         </div>
       </div>
     </form>`;
@@ -256,7 +298,7 @@ const renderAssets = () => {
     const job = S.jobText[a.file] && a.job ? `${a.job} · ${S.jobText[a.file]}` : a.job;
     const badges = [a.transcript && `<span class="pill green">transcribed · ${a.words} words</span>`, a.refDir && '<span class="pill green">frames ready</span>', job && `<span class="pill blue"><i class="dot"></i>${esc(job)}</span>`, a.jobError && `<span class="pill red" title="${esc(a.jobError)}">${esc(a.jobError.slice(0, 40))}</span>`].filter(Boolean).join('');
     return `<div class="asset"><div class="pv">${pv}</div><div class="meta">
-      <div class="spread"><div class="name" title="${esc(a.original)}">${esc(a.original)}</div><button type="button" class="btn ghost sm" data-action="rm-asset" data-file="${esc(a.file)}" title="Remove">✕</button></div>
+      <div class="spread"><div class="name" title="${esc(a.original)}">${esc(a.original)}</div>${a.role === 'reference' ? '' : `<button type="button" class="btn ghost sm" data-action="rm-asset" data-file="${esc(a.file)}" title="Remove">✕</button>`}</div>
       <div class="row"><select data-role="${esc(a.file)}">${ROLES.map((r) => `<option ${r === a.role ? 'selected' : ''}>${r}</option>`).join('')}</select><span class="muted">${info}</span></div>
       ${badges ? `<div class="row">${badges}</div>` : ''}
       <input placeholder="note for Claude (optional)" value="${esc(a.note ?? '')}" data-note="${esc(a.file)}" style="padding:5px 8px;font-size:12px;border-radius:8px" />
@@ -304,11 +346,23 @@ const uploadFiles = async (files) => {
 const renderConcepts = () => {
   const {project: p, concepts: doc, busy} = S.cur;
   if (!doc?.concepts?.length) {
-    $('#tab').innerHTML = busy || p.status === 'concepting'
-      ? '<div class="card waiting"><div class="spinner"></div><h2>Claude is studying your brief</h2><p>Reading the preset, your media and links, then designing concepts and rendering real sample frames. Follow along on the right.</p></div>'
-      : '<div class="card waiting"><h2>No concepts yet</h2><p>Fill the brief, then generate concepts.</p><button class="btn primary" data-tab="brief">Go to brief</button></div>';
+    if (S.conceptTimer) clearInterval(S.conceptTimer);
+    if (busy || p.status === 'concepting') {
+      const key = `studio-concepts-start-${p.id}`;
+      const started = Number(localStorage.getItem(key)) || Date.now();
+      localStorage.setItem(key, String(started));
+      const lastTool = [...(p.log ?? [])].reverse().find((e) => e.kind === 'tool');
+      $('#tab').innerHTML = `<div class="card waiting"><div class="spinner"></div><h2>Designing concepts</h2><p>Working from your brief and local references. This pass skips link fetching and audio transcription.</p><p class="small muted">Elapsed: <b id="concept-elapsed">0:00</b></p><p class="small" id="concept-activity">${esc(lastTool?.text || 'Planning two concept directions...')}</p><button type="button" class="btn danger" data-action="stop">Stop generation</button></div>`;
+      const tick = () => { const el = $('#concept-elapsed'); if (el) { const sec = Math.floor((Date.now() - started) / 1000); el.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; } };
+      tick(); S.conceptTimer = setInterval(tick, 1000);
+    } else {
+      localStorage.removeItem(`studio-concepts-start-${p.id}`);
+      $('#tab').innerHTML = '<div class="card waiting"><h2>No concepts yet</h2><p>Fill the brief, then generate concepts.</p><button class="btn primary" data-tab="brief">Go to brief</button></div>';
+    }
     return;
   }
+  if (S.conceptTimer) clearInterval(S.conceptTimer);
+  localStorage.removeItem(`studio-concepts-start-${p.id}`);
   const portrait = p.brief.height > p.brief.width;
   const approved = p.approvedConcept?.id;
   $('#tab').innerHTML = `
@@ -517,6 +571,76 @@ const saveAudio = async (form, {voChanged} = {}) => {
 
 // ---------- background: ask Claude to add animated objects behind the scenes ----------
 const BG_KINDS = [['icons', 'Glossy 3D icons', 'brand-style icons floating by'], ['sparkles', 'Sparkles & particles', 'soft glints and dust'], ['blobs', 'Gradient blobs', 'blurred colour that drifts'], ['shapes', 'Floating shapes', 'rings, pills, rounded shapes'], ['grid', 'Moving grid', 'slow dotted or line pattern']];
+// ---------- look & feel: choose the effects before the concepts (and change them later) ----------
+const LOOK_LV = ['Off', 'Light', 'Full'];
+const lookDemo = (k, mood = 'neutral') => ({
+  grain: '<div class="ld-photo"></div><div class="ld-grain"></div>',
+  vignette: '<div class="ld-photo"></div><div class="ld-vig"></div>',
+  grade: `<div class="ld-photo ld-g-${mood}"></div>${mood === 'cinematic' ? '<div class="ld-gtint"></div>' : ''}`,
+  leaks: '<div class="ld-photo"></div><div class="ld-leak"></div>',
+  motionBlur: '<div class="ld-mbdot"></div><div class="ld-mbdot"></div><div class="ld-mbdot"></div><div class="ld-mbdot"></div>',
+  sfx: '<div class="ld-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>',
+  camera: '<div class="ld-zoom ld-photo"></div>',
+  transitions: '<div class="ld-photo"></div><div class="ld-wipe"></div>',
+  physics: '<div class="ld-ball"></div>',
+  objects3d: '<div class="ld-coin"></div>',
+  illustration: '<div class="ld-icon"></div>',
+  particles: '<div class="ld-photo" style="opacity:.5"></div>' + '<div class="ld-dot"></div>'.repeat(6),
+  cursor: '<div class="ld-btn"></div><div class="ld-cur"></div>',
+  uiActions: '<div class="ld-toggle"></div><div class="ld-bar"></div>',
+  guidedFocus: '<div class="ld-photo"></div><div class="ld-focus"></div>',
+  captions: '<div class="ld-words"><span>Reply</span><span>faster</span><span>today</span></div>',
+}[k] ?? '');
+
+const lookState = () => {
+  const p = S.cur.project;
+  return {levels: {...(p.look?.levels ?? {})}, gradeMood: p.look?.gradeMood ?? 'neutral', bundle: p.look?.bundle ?? ''};
+};
+const saveLook = async (edit) => {
+  const id = S.cur.project.id;
+  const r = await api(`/api/projects/${id}/look`, {method: 'PUT', body: {look: edit}});
+  S.cur.project.look = r.look;
+  S.lookChanges = r.changes;
+  renderLook();
+};
+const renderLook = () => {
+  const {project: p, storyboard, busy, compositions} = S.cur;
+  const spec = S.state.lookSpec;
+  const st = lookState();
+  const built = !!storyboard;
+  const changes = built ? lookChangesLocal(p.look) : [];
+  const total = Object.values(st.levels).filter((v) => v > 0).length;
+  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  $('#tab').innerHTML = `
+    <div class="card" style="margin-bottom:18px"><div class="spread"><div><h2>Look &amp; feel</h2>
+      <div class="muted small" style="max-width:760px;margin-top:4px">Choose the effects, motion and extras <b>before</b> Claude designs concepts, so the concept frames already show them and the full build is right the first time. Each card plays a small sample. <span class="tagc">Instant</span> options are applied by the app as a finishing layer (no AI cost, live preview). <span class="tagc b">Built by Claude</span> options are designed into the video.</div></div>
+      <span class="pill ${total ? 'blue' : ''}">${total} option${total === 1 ? '' : 's'} on</span></div>
+      <div class="bundles" style="margin-top:14px">${spec.bundles.map((b) => `<button type="button" class="bundle ${st.bundle === b.id ? 'on' : ''}" data-look-bundle="${b.id}"><b>${esc(b.name)}</b><span>${esc(b.tagline)}</span></button>`).join('')}</div></div>
+    ${built ? `<div class="card" style="margin-bottom:18px"><div class="spread"><b>Live preview</b><span class="muted small">Instant options show here as you change them. Motion blur and sound effects appear in the final render.</span></div><div class="preview" style="height:340px;margin-top:10px"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div></div>` : ''}
+    <div class="look-groups">${spec.groups.map((g) => `<div class="look-group"><h3>${esc(g.title)}</h3><div class="look-grid">${g.items.map((it) => {
+      const lv = st.levels[it.key] ?? 0;
+      return `<div class="look-card ${lv ? 'on' : ''}"><div class="ld">${lookDemo(it.key, st.gradeMood)}</div>
+        <div class="t"><span>${esc(it.title)}</span><span class="tagc ${it.kind === 'built' ? 'b' : ''}">${it.kind === 'built' ? 'Built by Claude' : 'Instant'}</span></div>
+        <div class="d">${esc(it.desc)}</div>
+        <div class="seg">${LOOK_LV.map((l, n) => `<button type="button" class="${lv === n ? 'on' : ''}" data-look-key="${it.key}" data-look-level="${n}">${l}</button>`).join('')}</div>
+        <div class="lv">${lv ? esc(lv === 2 ? it.full : it.light) : ''}</div>
+        ${it.key === 'grade' && lv ? `<select data-look-mood>${spec.moods.map((m) => `<option ${m === st.gradeMood ? 'selected' : ''}>${m}</option>`).join('')}</select>` : ''}
+      </div>`;
+    }).join('')}</div></div>`).join('')}</div>
+    <div class="sticky-bar">
+      <div class="small muted">${built ? (changes.length ? `${changes.length} Claude-built change${changes.length === 1 ? '' : 's'} waiting. Instant options are already live.` : 'Instant options are live in the preview. Render to get motion blur and sound.') : 'Saved as you click. These choices are passed to Claude with your brief.'}</div>
+      <div class="row">
+        ${built && changes.length ? `<button type="button" class="btn gold" data-action="apply-look" ${busy ? 'disabled' : ''}>Apply ${changes.length} change${changes.length === 1 ? '' : 's'} with Claude</button>` : ''}
+        ${built ? '<button type="button" class="btn primary lg" data-tab="render">Preview &amp; render →</button>' : `<button type="button" class="btn primary lg" data-action="gen-concepts" ${busy ? 'disabled' : ''}>${S.cur.concepts ? 'Regenerate concepts' : 'Generate concepts'} →</button>`}
+      </div>
+    </div>`;
+};
+// same rule as the server: Claude-built options whose level differs from what was last applied
+const lookChangesLocal = (look) => {
+  const was = look?.applied?.levels ?? {};
+  return S.state.lookSpec.groups.flatMap((g) => g.items).filter((i) => i.kind === 'built' && (look?.levels?.[i.key] ?? 0) !== (was[i.key] ?? 0)).map((i) => ({key: i.key}));
+};
+
 // ---------- style: palette colours in style.json, saved as you pick ----------
 const renderStyle = () => {
   const {project: p, style, busy, compositions} = S.cur;
@@ -689,12 +813,15 @@ const refresh = (full = true) => {
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
   if (e.type === 'projects') return refresh(false);
+  if (e.type === 'planner') { if (S.cur?.project.id === e.projectId && S.plannerBusy) { S.plannerProgress = e; updatePlannerWait(); } return; }
   if (e.type === 'render') { S.renderJob = e; renderRenderPill(); if (S.cur?.project.id === e.projectId && S.tab === 'render') { if (e.done) refresh(); else renderRender(); } return; }
   if (!S.cur || e.projectId !== S.cur.project.id) { if (e.type === 'agent' && e.kind === 'done') refresh(false); return; }
   if (e.type === 'project') return refresh();
   if (e.type === 'job') { if (e.file) { S.jobText[e.file] = e.text; renderAssets(); } else { toast(e.text); if (e.done) refresh(); } return; }
   if (e.type === 'agent') {
     if (e.kind === 'status') { S.cur.busy = e.busy; renderChat(); return; }
+    if (S.tab === 'concepts' && S.cur.project.status === 'concepting' && ['tool', 'text'].includes(e.kind)) { const activity = $('#concept-activity'); if (activity) activity.textContent = e.text; }
+    if (S.plannerBusy && e.kind === 'tool') { S.plannerProgress = {message: e.text}; updatePlannerWait(); }
     if (e.kind === 'done') { refresh(); if (e.ok) toast(`${aiName()} finished.`); return; }
     S.cur.log.push(e);
     renderChat();
@@ -708,6 +835,10 @@ document.addEventListener('click', async (ev) => {
   if (ev.target.closest('#lightbox')) { $('#lightbox').hidden = true; return; }
   const tabBtn = ev.target.closest('[data-tab]');
   if (tabBtn && !tabBtn.disabled) { await flushSave(); S.tab = tabBtn.dataset.tab; go(S.cur.project.id, S.tab); return; }
+  const lk = ev.target.closest('[data-look-key]');
+  if (lk) { const st = lookState(); st.levels[lk.dataset.lookKey] = Number(lk.dataset.lookLevel); st.bundle = ''; try { await saveLook(st); } catch (e) { toast(e.message); } return; }
+  const lb = ev.target.closest('[data-look-bundle]');
+  if (lb) { try { await saveLook({bundle: lb.dataset.lookBundle, levels: null}); } catch (e) { toast(e.message); } return; }
   const sizeBtn = ev.target.closest('[data-size]');
   if (sizeBtn) { const [w, h] = sizeBtn.dataset.size.split('x').map(Number); setBrief('width', w); setBrief('height', h); renderBrief(); return; }
   const a = ev.target.closest('[data-action]');
@@ -741,8 +872,45 @@ document.addEventListener('click', async (ev) => {
       }
       case 'new': {
         const p = await api('/api/projects', {method: 'POST', body: {presetId: a.dataset.preset || null}});
-        go(p.id, 'brief');
+        go(p.id, 'script');
         break;
+      }
+      case 'planner-upload': $('#planner-file').click(); break;
+      case 'planner-delete-frame': {
+        const frame = a.dataset.frame, video = a.dataset.video;
+        if (!confirm(`Delete the ${frame.match(/f-(\d+\.\d+)s/)?.[1] || ''} second snapshot? It will be removed from your reference set.`)) break;
+        const result = await api(`/api/projects/${id}/reference-frames/${encodeURIComponent(video)}/${encodeURIComponent(frame)}`, {method: 'DELETE'});
+        S.cur.referenceFrames[video] = result.frames; renderProject(); toast('Snapshot deleted.'); break;
+      }
+      case 'script-help':
+      case 'script-generate': {
+        await flushSave();
+        const b = S.cur.project.brief;
+        S.plannerBusy = true; S.plannerAborting = false; S.plannerProgress = null; S.plannerStartedAt = Date.now(); renderProject(); updatePlannerWait();
+        S.plannerTimer = setInterval(updatePlannerWait, 1000);
+        try {
+          const result = await api(`/api/projects/${id}/script-plan`, {method: 'POST', body: {brief: {idea: b.idea, audience: b.audience, style: b.style, durationSec: b.durationSec, notes: b.notes, plannerScript: b.plannerScript, plannerRefs: b.plannerRefs || []}, action: a.dataset.action === 'script-help' ? 'coach' : 'generate'}});
+          S.cur.project.brief = {...S.cur.project.brief, ...result.brief};
+        } finally { clearInterval(S.plannerTimer); S.plannerBusy = false; S.plannerAborting = false; S.plannerStartedAt = null; S.plannerProgress = null; renderProject(); }
+        toast('Script plan updated.');
+        break;
+      }
+      case 'planner-cancel':
+        S.plannerAborting = true; updatePlannerWait();
+        await api(`/api/projects/${id}/script-plan/cancel`, {method: 'POST'});
+        toast('Cancellation requested.');
+        break;
+      case 'restore-planner-version': {
+        const b = S.cur.project.brief, index = Number(a.dataset.version), versions = b.plannerVersions ?? [], chosen = versions[index];
+        if (!chosen) break;
+        const history = [...(b.plannerScript?.trim() && b.plannerScript !== chosen.text ? [{text: b.plannerScript, savedAt: Date.now()}] : []), ...versions.filter((_, i) => i !== index)].slice(0, 10);
+        S.cur.project = await api(`/api/projects/${id}`, {method: 'PATCH', body: {brief: {plannerScript: chosen.text, plannerVersions: history}}});
+        renderProject(); toast('Previous script draft restored.'); break;
+      }
+      case 'script-finalize': {
+        await flushSave(); const b = S.cur.project.brief;
+        const patch = {idea: b.idea || b.plannerScript, script: b.plannerScript || b.script};
+        S.cur.project = await api(`/api/projects/${id}`, {method: 'PATCH', body: {brief: patch}}); S.tab = 'brief'; go(id, 'brief'); toast('Script and details added to the video brief.'); break;
       }
       case 'delete':
         if (confirm(`Delete "${S.cur.project.title}" with its code, uploads and renders?`)) { await api(`/api/projects/${id}`, {method: 'DELETE'}); go(null); }
@@ -826,6 +994,7 @@ document.addEventListener('click', async (ev) => {
         $('#style-request').value = ''; toast('Sent to Claude.');
         break;
       }
+      case 'apply-look': await api(`/api/projects/${id}/look/apply`, {method: 'POST'}); S.lookChanges = []; toast('Claude is applying the changes…'); break;
       case 'add-background': {
         S.bgForm = readBgForm();
         await api(`/api/projects/${id}/background`, {method: 'POST', body: S.bgForm});
@@ -858,6 +1027,12 @@ document.addEventListener('input', (ev) => {
     $('#audio-state').textContent = 'Unsaved changes.';
     return;
   }
+  if (t.closest('#tab') && t.name?.startsWith('planner') && t.name !== 'plannerProvider') {
+    const key = t.name, val = t.value;
+    S.cur.project.brief[key] = val;
+    queueSave({brief: {...(pending.brief ?? {}), [key]: val}});
+    return;
+  }
   if (!t.closest('#brief') || !t.name) return;
   if (t.name === 'title') { S.cur.project.title = t.value; queueSave({title: t.value}); return; }
   if (t.name === 'presetId') return;
@@ -867,12 +1042,27 @@ document.addEventListener('input', (ev) => {
 document.addEventListener('change', async (ev) => {
   const t = ev.target;
   try {
+    if (t.id === 'planner-file' && t.files?.length) {
+      const fd = new FormData(); fd.append('role', 'reference'); fd.append('files', t.files[0]);
+      toast(`Uploading ${t.files[0].name}…`, 60000);
+      const assets = await api(`/api/projects/${S.cur.project.id}/assets`, {method: 'POST', body: fd});
+      const refs = [...new Set([...(S.cur.project.brief.plannerRefs || []), assets.at(-1)?.file].filter(Boolean))];
+      await api(`/api/projects/${S.cur.project.id}`, {method: 'PATCH', body: {brief: {plannerRefs: refs}}});
+      await loadProject(S.cur.project.id); renderProject(); toast('Sample video added. Preparing snapshots...'); return;
+    }
+    if (t.dataset.plannerRef) {
+      const refs = new Set(S.cur.project.brief.plannerRefs || []); t.checked ? refs.add(t.dataset.plannerRef) : refs.delete(t.dataset.plannerRef);
+        setBrief('plannerRefs', [...refs]); updatePlannerPreflight(); return;
+    }
     if (t.dataset.role) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.role)}`, {method: 'PATCH', body: {role: t.value}}); return; }
     if (t.dataset.note != null) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.note)}`, {method: 'PATCH', body: {note: t.value}}); return; }
     if (t.name === 'ai-provider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); S.aiOpen = true; renderHome(); return; }
+    if (t.name === 'plannerProvider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); renderProject(); return; }
+    if (t.name?.startsWith('planner')) { setBrief(t.name, t.value); return; }
     if (t.name === 'presetId') { await flushSave(); S.cur.project = await api(`/api/projects/${S.cur.project.id}`, {method: 'PATCH', body: {presetId: t.value}}); renderProject(); return; }
     if (t.name === 'brandId' || t.name === 'width' || t.name === 'height') { await flushSave(); renderBrief(); }
     if (t.id === 'file') uploadFiles([...t.files]);
+    if (t.dataset.lookMood !== undefined) { const st = lookState(); st.gradeMood = t.value; await saveLook(st); return; }
     if (t.dataset.sc) {
       const colors = Object.fromEntries([...document.querySelectorAll('#styleform [data-sc]')].map((el) => [el.dataset.sc, el.value]));
       S.cur.style = await api(`/api/projects/${S.cur.project.id}/style`, {method: 'PUT', body: {colors}});

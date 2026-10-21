@@ -53,6 +53,25 @@ local models will struggle with full builds. Each project keeps its own conversa
    (half resolution) or the final MP4 and download it.
 6. **Save as preset.** Turns the approved approach into a new preset for next time.
 
+### Look & feel (chosen before the concepts)
+
+The step after Brief. Every option has a small looping sample and an Off / Light / Full level, and there are one-click bundles
+(Nothing extra, Clean tutorial, Premium glossy, High-energy reel). The choices are saved on the project, passed to Claude with
+the brief (so concept stills and the build include them) and can be changed after the build.
+- **Instant** options (motion blur, colour grade, vignette, film grain, light leaks, sound effects) are applied by the app as a
+  finishing layer (`StudioLook.tsx`, settings in `src/studio/<project>/look.json`, wired in `registry.tsx`). No Claude run, live in
+  the preview. Motion blur and sound effects appear only in real renders (not the preview, concept stills or draft renders).
+  Sound effects are original built-in sounds in `magicbolt-reel/public/sfx/` (`node studio/bin/make-sfx.mjs` regenerates them),
+  placed at the scene starts from the storyboard.
+- **Built by Claude** options (spring physics, camera moves, transitions, 3D objects, illustrations, particles, cursor choreography,
+  UI animations, guided focus, kinetic captions) are designed into the video. After the build, changing them shows
+  "Apply N changes with Claude", which sends only the difference.
+- The option list lives in `studio/server/look.mjs`.
+- **Effects kit** (`magicbolt-reel/src/studio/kit/`): the Claude-built options as ready, deterministic components (`SceneSeq` transitions,
+  `CameraRig`, `SpringIn`, `Obj3D` coin/bubble/phone/QR card, `Particles`, `CursorPath`, `Toggle`/`CountUp`/`ProgressBar`/`Notification`,
+  `Spotlight`, `KineticCaptions`). Claude reads the short `KIT.md` and assembles videos from it instead of writing these each time,
+  which saves tokens and keeps quality consistent. Composition `Studio-kit-demo` in Remotion Studio shows every piece.
+
 ### Text and Audio tabs (edit without a Claude run)
 
 - **Text** edits `src/studio/<project>/text.json` (every on-screen string).

@@ -3,6 +3,7 @@
 import path from 'node:path';
 import {REEL, STUDIO, projectDir, projectAssets, projectCode, compId, conceptsCompId} from './paths.mjs';
 import {getPreset, getBrand, listPresets} from './projects.mjs';
+import {lookContext} from './look.mjs';
 
 const rel = (p) => path.relative(REEL, p).split(path.sep).join('/');
 
@@ -38,6 +39,9 @@ review it and render. Your text replies appear in the app's activity panel: keep
 (what you did, what you need). Never ask the user to run commands; you run everything.
 
 ## Where things are (cwd is the Remotion project ${REEL})
+- Effects kit: src/studio/kit/ (camera moves, scene transitions, spring physics, 3D objects, particles, cursor and UI actions,
+  guided focus, kinetic captions). Read src/studio/kit/KIT.md (short) before building any of those and use the kit components with the
+  chosen Look & feel level; do not read the kit sources or write your own versions. Composition Studio-kit-demo shows them all.
 - Existing approved videos and reusable kits: src/** (read them; reuse their components instead of starting over).
 - Each studio project has:
   - code: src/studio/<id>/ (index.tsx must export COMPOSITIONS: StudioComp[] from '../types')
@@ -122,24 +126,23 @@ ${fmtAssets(p)}
 ${fmtPreset(p)}
 
 ### Brand
-${fmtBrand(p)}`;
+${fmtBrand(p)}${p.look?.reviewed ? `\n\n${lookContext(p.look)}` : ''}`;
 
 export const conceptsPrompt = (p, feedback) => `${context(p)}
 
 ## Task: propose concepts (do NOT build the full video yet)
 ${feedback ? `The user reviewed the previous concepts and said:\n> ${feedback.replace(/\n/g, '\n> ')}\nRevise accordingly (keep what they liked).\n` : ''}
-1. Analyse the brief: read the preset's reference files, look at uploaded images and reference-video frames, read
-   transcripts (or transcribe the voiceover), and fetch the links.
-2. Design 3 clearly different concepts (2 if the preset fixes most of the look). Each concept = a name, a one-line
+1. Work quickly from the brief, preset recipe, and provided local images and reference-video frames. Do not fetch web links or transcribe audio during concept generation; use the supplied copy and facts.
+2. Design 2 clearly different concepts (3 only when the brief needs distinct options). Each concept = a name, a one-line
    idea, palette, typography, motion language and a scene outline with timing.
 3. Build ${conceptsCompId(p.id)} in ${rel(projectCode(p.id))}/: a composition at ${p.brief.width}x${p.brief.height} that
-   takes {concept: 'a' | 'b' | 'c'} and shows each concept's key moments (3-4 moments per concept, at real quality,
+   takes {concept: 'a' | 'b'} and shows each concept's key moments (2 moments per concept, at real quality,
    with real copy from the brief). Export it from index.tsx COMPOSITIONS, then run the registry and typecheck.
 4. Write ${projectDir(p.id)}/concepts.json:
    {"fps": ${p.brief.fps}, "composition": "${conceptsCompId(p.id)}", "analysis": ["what you understood", "..."],
     "concepts": [{"id": "a", "name": "", "idea": "", "palette": ["#hex"], "fonts": "", "motion": "",
       "outline": [{"scene": "Hook", "sec": 3.5, "what": "..."}], "samples": [{"t": 1.2, "label": "Hook"}]}]}
-5. Run \`node ../studio/bin/samples.mjs ${p.id}\`, look at every sample, fix weak ones, re-run.
+5. Run \`node ../studio/bin/samples.mjs ${p.id}\` once and inspect the rendered samples. Fix only visible blocking issues.
 Reply with 2-4 short lines: what the concepts are and anything you need from the user.`;
 
 export const buildPrompt = (p, conceptId, notes) => `${context(p)}
