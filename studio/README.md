@@ -17,6 +17,17 @@ The app uses your existing Claude Code login, so it needs no API key. Usage coun
 It only ever uses that local login: `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` and other provider variables are
 stripped before Claude starts, and the studio stores no credentials of its own. Not signed in? Run `claude` and `/login`.
 
+### Other AI models
+
+Open **AI model** at the top of the home page to pick who does the work: Claude Code (default), OpenAI, Google Gemini,
+OpenRouter, Ollama (local) or any other OpenAI-compatible API. Set the model id and paste an API key (or use
+`OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY`), then **Test connection**. The key stays on this PC in
+`studio/data/settings.json`.
+
+Other models get the same prompts and tools (read and look at images, write, edit, shell, find, search) and the
+same safety rules as Claude. The model must support tool calling, and vision to check rendered frames. Weaker or small
+local models will struggle with full builds. Each project keeps its own conversation in `data/<project>/agent-session.json`.
+
 ## Flow
 
 1. **Pick a preset** on the home page, or start blank. Presets are looks you've already approved:

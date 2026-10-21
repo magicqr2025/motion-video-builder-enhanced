@@ -1,0 +1,45 @@
+{
+  "id": "saas-glass-showroom",
+  "name": "intro waycrm 1m style",
+  "category": "Promo 16:9",
+  "tagline": "Bright glossy product intro built on real app screenshots: framed screens swing in with 3D tilt, key UI pieces lift off in gold-ringed cards, feature titles land on the spoken words, MagicBolt logo-build CTA.",
+  "example": {
+    "composition": "Studio-untitled-video",
+    "t": 13.6
+  },
+  "defaults": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 24,
+    "language": "English",
+    "captions": "none (spoken key phrases appear as feature titles)",
+    "brand": "magicbolt"
+  },
+  "asks": [
+    "voiceover (mp3); about 60 s is ideal",
+    "app screenshots (2880x1800 or any 16:10), one per feature, with demo data only",
+    "feature list in voiceover order and the key on-screen phrase for each",
+    "CTA text and the website to show under the button"
+  ],
+  "reuse": [
+    "src/studio/untitled-video/Video.tsx",
+    "src/studio/untitled-video/parts.tsx",
+    "src/studio/untitled-video/config.ts",
+    "src/studio/untitled-video/text.json",
+    "src/studio/untitled-video/Concepts.tsx",
+    "src/logo/LogoAnim.tsx",
+    "src/glow/parts.tsx",
+    "src/components/kit.tsx"
+  ],
+  "recipe": [
+    "Structure (scene starts = VO sentence starts): Hook (real chat rows stack up, two tilt and fall away tagged 'Missed', question builds word by word) -> 'Meet <product>' (gradient wordmark + dashboard rising in 3D) -> one scene per feature -> three-line tagline (mini tilted screens + glossy icon pills) -> CTA (LogoAnim build frozen at 3.3 s, product name, gold glossy CTA button, site) held ~3 s after the VO ends.",
+    "Feature scene layout: Feature label top-left (glossy 3D IconChip + Poppins Bold navy title, gold underline, slate sub line) + Screen (glossy white frame, light sweep) swinging in with rotateY ~9 deg from the right (Swing), + 1-3 'Lift' callouts: the exact UI rectangle cropped from the screenshot (CROP rects in 2000x1250 'D units') in a white card with a gold ring, popping forward with overshoot and bobbing.",
+    "Variety per feature: stat cards that count up (broadcast), source pills that fly into the screen (leads), a dragged lead card with cursor (board), a centre profile card with six icon pills and dashed links (one profile), chips plus slide-in chat thread (team), an 'Ask AI' Q&A card with typing dots (AI), gold ring overlay drawn inside the screen to point at a region (rather than duplicating it with a lift when it sits at the screen edge).",
+    "Timing: transcribe the VO, set SCENES {start, dur} from sentence starts in config.ts, and write cues as absolute VO word times through rel() so each title, lift or pill lands on its spoken word. Scenes crossfade with a 0.35 s soft zoom (XFADE).",
+    "Look: SkyBG (white to #E3EEFF with slow blue/gold blobs and a drifting dot grid, all subtle), MagicBolt palette navy #0E1B4D / deep #1354BC / blue #1582D5 / gold #FDC60B / orange #F7941D / slate #5A6488; the app's own green stays inside the screenshots only. Sparkles as accents, never emoji.",
+    "Copy: one short title + one sub line per scene, every string in text.json (lists for sources, profile items, chips, tagline); layouts use fit() so text can grow ~30%. Demo data only, taken from the user's screenshots.",
+    "Approved in concepts: user picked the bright 'Glass Showroom' look over the dark navy 3D panels and the blue bento wall. No running subtitles: the brief wanted an uncluttered screen with key phrases highlighted, so titles on spoken words replace captions.",
+    "Checks: render stills with frame numbers (fN = seconds x 24), because still.mjs converts seconds at 30 fps; look at hook, every feature scene and the CTA. Known VO pitfall: Whisper/TTS may say the brand wrong (e.g. 'Waste CRM'); on-screen text uses the correct name."
+  ],
+  "custom": true
+}

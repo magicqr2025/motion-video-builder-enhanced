@@ -1,0 +1,15 @@
+export const TUT = {
+  fps: 24,
+  width: 1920,
+  height: 1080,
+  moment: 3,
+  moments: 4,
+  sampleAt: 2.15,
+  navy: '#0E1B4D',
+  deep: '#1354BC',
+  blue: '#1582D5',
+  gold: '#FDC60B',
+  orange: '#F7941D',
+  slate: '#5A6488',
+  green: '#19A974',
+};

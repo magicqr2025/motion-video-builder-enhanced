@@ -23,7 +23,22 @@ const STATUS = {
 };
 const SCENE_COLORS = ['#1354BC', '#1582D5', '#F7941D', '#7B3FF2', '#ED1C6F', '#16A34A', '#0E1B4D', '#E0A800'];
 
-const S = {state: null, cur: null, tab: 'brief', editing: false, renderJob: null, jobText: {}};
+const S = {
+  state: null, cur: null, tab: 'brief', editing: false, renderJob: null, jobText: {},
+  leftCollapsed: localStorage.getItem('studio-left-collapsed') === '1',
+  rightCollapsed: localStorage.getItem('studio-right-collapsed') === '1',
+};
+const applyPanelState = () => {
+  const layout = $('.layout');
+  layout.classList.toggle('left-collapsed', S.leftCollapsed);
+  layout.classList.toggle('right-collapsed', S.rightCollapsed);
+  const left = $('#toggle-left'), right = $('#toggle-right');
+  left.textContent = S.leftCollapsed ? 'Show projects' : 'Hide projects';
+  right.textContent = S.rightCollapsed ? 'Show chat' : 'Hide chat';
+  left.setAttribute('aria-expanded', String(!S.leftCollapsed));
+  right.setAttribute('aria-expanded', String(!S.rightCollapsed));
+};
+applyPanelState();
 
 // ---------- routing ----------
 const route = () => {
@@ -78,6 +93,35 @@ const renderRenderPill = () => {
 
 // ---------- home: presets ----------
 const presetThumb = (pr) => `/data/_presets/${pr.id}.png`;
+// ---------- AI model settings (home page) ----------
+const aiName = () => { const ai = S.state?.settings?.ai; return !ai || ai.provider === 'claude' ? 'Claude' : ai.provider === 'codex' ? 'Codex' : (ai.model || S.state.settings.providers[ai.provider]?.model || 'AI'); };
+const aiCard = () => {
+  const st = S.state.settings ?? {};
+  const ai = st.ai ?? {provider: 'claude'};
+  const provs = st.providers ?? {claude: {name: 'Claude Code (your login)'}};
+  const def = provs[ai.provider] ?? {};
+  const isClaude = ai.provider === 'claude';
+  const isCodex = ai.provider === 'codex';
+  return `<details class="card ai-card" style="margin:0 0 22px" open>
+    <summary class="spread" style="cursor:pointer"><b>AI model</b><span class="muted small">${esc(provs[ai.provider]?.name ?? 'Claude')}${isClaude || isCodex ? '' : ` · ${esc(ai.model || def.model)}`}</span></summary>
+    <div id="ai-form" style="margin-top:12px;display:grid;gap:10px">
+      ${select('ai-provider', 'Provider', ai.provider, Object.entries(provs).map(([k, v]) => [k, v.name]))}
+      ${isClaude ? '<p class="small muted" style="margin:0">Uses the Claude Code login on this PC (run <code>claude</code> and <code>/login</code> once). No API key needed.</p>' : isCodex ? `
+        <p class="small muted" style="margin:0">Uses the Codex CLI login on this PC. Enter a model ID available in your Codex account's model picker. No API key needed.</p>
+        ${field('ai-model', 'Codex model ID', ai.model, {placeholder: 'model ID from your Codex model picker', hint: 'This must be available to your signed-in ChatGPT account.'})}` : `
+        ${field('ai-model', 'Model', ai.model, {placeholder: def.model || 'model name', hint: 'The exact model id your provider uses. It must support tool calling; vision is needed to check rendered frames.'})}
+        ${field('ai-baseUrl', 'API address', ai.baseUrl, {placeholder: def.baseUrl || 'https://…/v1'})}
+        ${field('ai-apiKey', 'API key', '', {type: 'password', placeholder: ai.keySaved ? `saved (${ai.keyHint}): leave empty to keep` : ai.hasKey ? `using ${def.keyEnv} from the environment` : ai.provider === 'ollama' ? 'not needed for Ollama' : 'paste your key', hint: 'Stored only on this PC in studio/data/settings.json.'})}`}
+      <div class="row" style="gap:8px">
+        ${isClaude ? '' : '<button class="btn primary sm" data-action="save-ai">Save</button>'}
+        <button class="btn ghost sm" data-action="test-ai">Test connection</button>
+        ${ai.keySaved ? '<button class="btn ghost sm" data-action="clear-ai-key">Remove saved key</button>' : ''}
+        <span class="small muted" id="ai-test"></span>
+      </div>
+    </div>
+  </details>`;
+};
+
 const renderHome = () => {
   $('#crumbs').innerHTML = '';
   $('#chat').hidden = true;
@@ -89,6 +133,7 @@ const renderHome = () => {
       <p>Pick a preset (a look you've already approved) or start blank. Fill the brief, Claude proposes concepts as real sample frames, you approve one, and it builds the full video with timing synced to your voiceover.</p>
       <div class="steps"><span>1 · Brief</span><span>2 · Concept stills</span><span>3 · Approve</span><span>4 · Full build</span><span>5 · Render MP4</span></div>
     </div>
+    ${aiCard()}
     <div class="section-title"><h2>Start from a preset</h2><span class="muted">no need to explain the style again</span></div>
     ${cats.map((c) => `
       <h3 style="margin:18px 0 10px;color:var(--slate)">${esc(c)}</h3>
@@ -432,6 +477,7 @@ const renderChat = () => {
   el.innerHTML = items.join('') || `<div class="chat-empty">This is where Claude reports what it's doing. You can also type here at any time: ask questions, give feedback on concepts, or request changes to the built video.</div>`;
   if (atBottom || renderChat.first !== S.cur.project.id) el.scrollTop = el.scrollHeight;
   renderChat.first = S.cur.project.id;
+  $('#chat-head-name').textContent = aiName();
   $('#agent-state').innerHTML = S.cur.busy ? '<i class="dot"></i> working' : 'idle';
   $('#stop-btn').hidden = !S.cur.busy;
 };
@@ -460,7 +506,7 @@ es.onmessage = (m) => {
   if (e.type === 'job') { if (e.file) { S.jobText[e.file] = e.text; renderAssets(); } else { toast(e.text); if (e.done) refresh(); } return; }
   if (e.type === 'agent') {
     if (e.kind === 'status') { S.cur.busy = e.busy; renderChat(); return; }
-    if (e.kind === 'done') { refresh(); if (e.ok) toast('Claude finished.'); return; }
+    if (e.kind === 'done') { refresh(); if (e.ok) toast(`${aiName()} finished.`); return; }
     S.cur.log.push(e);
     renderChat();
   }
@@ -480,7 +526,30 @@ document.addEventListener('click', async (ev) => {
   const id = S.cur?.project.id;
   try {
     switch (a.dataset.action) {
+      case 'toggle-left':
+        S.leftCollapsed = !S.leftCollapsed;
+        localStorage.setItem('studio-left-collapsed', S.leftCollapsed ? '1' : '0');
+        applyPanelState();
+        break;
+      case 'toggle-right':
+        S.rightCollapsed = !S.rightCollapsed;
+        localStorage.setItem('studio-right-collapsed', S.rightCollapsed ? '1' : '0');
+        applyPanelState();
+        break;
       case 'home': go(null); break;
+      case 'save-ai': {
+        const v = (n) => $(`#ai-form [name="${n}"]`)?.value ?? '';
+        S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {model: v('ai-model'), baseUrl: v('ai-baseUrl'), apiKey: v('ai-apiKey')}}});
+        S.aiOpen = true; renderHome(); toast('AI model saved.');
+        break;
+      }
+      case 'clear-ai-key': S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {apiKey: null}}}); S.aiOpen = true; renderHome(); toast('Saved key removed.'); break;
+      case 'test-ai': {
+        $('#ai-test').textContent = 'Testing…';
+        const r = await api('/api/settings/test-ai', {method: 'POST'});
+        $('#ai-test').textContent = r.ok ? `✓ ${r.text}` : `✗ ${r.text}`;
+        break;
+      }
       case 'new': {
         const p = await api('/api/projects', {method: 'POST', body: {presetId: a.dataset.preset || null}});
         go(p.id, 'brief');
@@ -572,6 +641,7 @@ document.addEventListener('change', async (ev) => {
   try {
     if (t.dataset.role) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.role)}`, {method: 'PATCH', body: {role: t.value}}); return; }
     if (t.dataset.note != null) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.note)}`, {method: 'PATCH', body: {note: t.value}}); return; }
+    if (t.name === 'ai-provider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); S.aiOpen = true; renderHome(); return; }
     if (t.name === 'presetId') { await flushSave(); S.cur.project = await api(`/api/projects/${S.cur.project.id}`, {method: 'PATCH', body: {presetId: t.value}}); renderProject(); return; }
     if (t.name === 'brandId' || t.name === 'width' || t.name === 'height') { await flushSave(); renderBrief(); }
     if (t.id === 'file') uploadFiles([...t.files]);

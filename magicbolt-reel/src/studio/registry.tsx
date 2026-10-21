@@ -2,10 +2,16 @@
 import React from 'react';
 import {Composition, Folder} from 'remotion';
 import type {StudioComp} from './types';
-import {COMPOSITIONS as P0} from './lead-center-loop';
+import {COMPOSITIONS as P0} from './intro-waycrm-1m-style-2';
+import {COMPOSITIONS as P1} from './lead-center-loop';
+import {COMPOSITIONS as P2} from './tutorial-animated-screens-2';
+import {COMPOSITIONS as P3} from './untitled-video';
 
 const PROJECTS: [string, StudioComp[]][] = [
-  ['lead-center-loop', P0],
+  ['intro-waycrm-1m-style-2', P0],
+  ['lead-center-loop', P1],
+  ['tutorial-animated-screens-2', P2],
+  ['untitled-video', P3],
 ];
 
 export const StudioCompositions: React.FC = () => (

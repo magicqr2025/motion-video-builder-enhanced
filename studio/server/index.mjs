@@ -12,6 +12,8 @@ import {runAgent, isBusy, stopAgent} from './agent.mjs';
 import {conceptsPrompt, buildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, textEditedNote} from './prompts.mjs';
 import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, STUDIO_PORT} from './remotion.mjs';
 import {transcribeFile} from './transcribe.mjs';
+import {readSettings, writeSettings, publicSettings, updateAi, aiConfig} from './settings.mjs';
+import {pingModel} from './providers/openai.mjs';
 
 const PORT = Number(process.env.PORT ?? 4321);
 const app = express();
@@ -69,7 +71,7 @@ const processAssetNow = async (id, file) => {
 
 // ---------- state ----------
 app.get('/api/state', wrap(async (req, res) => {
-  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: readSettings()});
+  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: publicSettings()});
 }));
 
 app.post('/api/projects', wrap(async (req, res) => {
@@ -257,11 +259,8 @@ app.post('/api/projects/:id/samples', wrap(async (req, res) => {
   changed(p.id);
 }));
 
-// ---------- settings: output folder for finished renders ----------
-const SETTINGS = path.join(DATA, 'settings.json');
-const readSettings = () => { try { return JSON.parse(fs.readFileSync(SETTINGS, 'utf8')); } catch { return {}; } };
-const writeSettings = (s) => { fs.mkdirSync(DATA, {recursive: true}); fs.writeFileSync(SETTINGS, JSON.stringify(s, null, 2)); };
-app.get('/api/settings', (req, res) => res.json(readSettings()));
+// ---------- settings: output folder for finished renders, AI model ----------
+app.get('/api/settings', (req, res) => res.json(publicSettings()));
 app.put('/api/settings', wrap(async (req, res) => {
   const s = readSettings();
   if ('outDir' in req.body) {
@@ -270,7 +269,20 @@ app.put('/api/settings', wrap(async (req, res) => {
     if (dir) fs.mkdirSync(dir, {recursive: true});
     s.outDir = dir ? path.resolve(dir) : '';
   }
-  writeSettings(s); res.json(s);
+  writeSettings(s);
+  if (req.body.ai) updateAi(req.body.ai);
+  res.json(publicSettings());
+}));
+// check that the chosen AI model answers (key, address and model name)
+app.post('/api/settings/test-ai', wrap(async (req, res) => {
+  const cfg = aiConfig();
+  if (cfg.provider === 'claude') return res.json({ok: true, text: 'Using your Claude Code login.'});
+  if (cfg.provider === 'codex') {
+    const result = await new Promise((resolve) => execFile('codex', ['login', 'status'], {windowsHide: true}, (error, stdout, stderr) => resolve({error, stdout, stderr})));
+    return res.json({ok: !result.error, text: result.error ? `Codex CLI login unavailable: ${String(result.stderr || result.error.message).trim()}` : 'Codex CLI is available and signed in on this PC.'});
+  }
+  try { await pingModel(cfg); res.json({ok: true, text: `${cfg.model} answered.`}); }
+  catch (e) { res.json({ok: false, text: String(e.message ?? e)}); }
 }));
 // native folder picker (a web page can't see real paths)
 app.post('/api/settings/pick-folder', wrap(async (req, res) => {
@@ -356,6 +368,7 @@ const thumbsFor = async (force) => {
 };
 
 // ---------- files ----------
+app.use('/data', (req, res, next) => (/^\/(settings\.json|[^/]+\/agent-session\.json)$/i.test(decodeURIComponent(req.path)) ? res.status(404).end() : next())); // holds the API key / raw model history
 app.use('/data', express.static(DATA, {fallthrough: false}));
 app.use('/public', express.static(path.join(REEL, 'public'), {fallthrough: false}));
 app.use(express.static(WEB, {setHeaders: (res) => res.set('Cache-Control', 'no-cache')}));
@@ -363,12 +376,40 @@ app.use(express.static(WEB, {setHeaders: (res) => res.set('Cache-Control', 'no-c
 const URL_ = `http://localhost:${PORT}`;
 const openBrowser = () => { if (!process.argv.includes('--no-open')) exec(process.platform === 'win32' ? `start "" "${URL_}"` : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} ${URL_}`); };
 
+// If the studio stopped mid-run (PC out of memory, window closed), projects stay "concepting"/"building"/"rendering"
+// with a spinner forever. Called once this copy owns the port (so nothing is running), it puts them back to the
+// last finished step.
+const recoverStuck = () => {
+  for (const {id} of listProjects()) {
+    const q = getProject(id);
+    if (!q || !['concepting', 'building', 'rendering'].includes(q.status)) continue;
+    const before = q.status;
+    q.status = readStoryboard(id) ? (q.renders?.length ? 'done' : 'review') : readConcepts(id)?.concepts?.length ? 'concepts' : 'brief';
+    saveProject(q);
+    appendLog(id, {kind: 'error', text: `Video Studio stopped while this was ${before} (often the PC ran out of memory). Status reset to "${q.status}"; your files are kept. Start the step again.`});
+    console.log(`  ! ${id}: was ${before} when the studio stopped, reset to ${q.status}`);
+  }
+};
+
+// Leave a trace when the server dies, so the next start can say why.
+const CRASH_LOG = path.join(DATA, 'crash.log');
+const crashed = (kind) => (e) => {
+  try { fs.appendFileSync(CRASH_LOG, `${new Date().toISOString()} ${kind}: ${e?.stack ?? e}\n  free RAM ${Math.round(os.freemem() / 2 ** 20)} MB of ${Math.round(os.totalmem() / 2 ** 20)} MB\n`); } catch {}
+  console.error(`\n  Video Studio crashed (${kind}): ${e?.message ?? e}\n`);
+  process.exit(1);
+};
+process.on('uncaughtException', crashed('uncaughtException'));
+process.on('unhandledRejection', crashed('unhandledRejection'));
+
 const server = app.listen(PORT, (err) => {
   if (err) return; // handled by the 'error' listener below (Express 5 also passes it here)
+  try { recoverStuck(); } catch (e) { console.error('  ! Could not check for stuck projects:', e.message); }
   console.log(`\n  MagicBolt Video Studio  ->  ${URL_}\n  Remotion Studio (live preview)  ->  http://localhost:${STUDIO_PORT}\n`);
   // Claude runs on this PC's Claude Code login only (API keys are ignored, see agent.mjs). macOS keeps it in the Keychain.
   const creds = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), '.credentials.json');
-  if (process.platform !== 'darwin' && !fs.existsSync(creds)) console.log('  ! Not signed in to Claude Code on this PC. Run "claude" in a terminal and type /login.\n');
+  const ai = aiConfig();
+  if (ai.provider !== 'claude') console.log(`  AI model: ${ai.model} via ${ai.baseUrl} (change it under "AI model" on the home page)\n`);
+  else if (process.platform !== 'darwin' && !fs.existsSync(creds)) console.log('  ! Not signed in to Claude Code on this PC. Run "claude" in a terminal and type /login.\n');
   else console.log('  Claude: using your local Claude Code login (no API key)\n');
   if (!process.env.NO_REMOTION_STUDIO) startRemotionStudio((s) => { if (/error/i.test(s)) process.stdout.write(`[remotion] ${s}`); });
   openBrowser();

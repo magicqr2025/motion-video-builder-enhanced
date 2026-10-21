@@ -17,12 +17,14 @@
     </a>
     <div class="top-mid" id="crumbs"></div>
     <div class="top-right">
+      <button class="btn ghost sm panel-toggle" id="toggle-left" data-action="toggle-left" type="button" aria-controls="projects-sidebar" aria-expanded="true">Hide projects</button>
+      <button class="btn ghost sm panel-toggle" id="toggle-right" data-action="toggle-right" type="button" aria-controls="chat" aria-expanded="true">Hide chat</button>
       <span class="pill" id="render-pill" hidden></span>
       <a class="btn ghost sm" id="open-remotion" target="_blank" rel="noopener">Remotion Studio ↗</a>
     </div>
   </header>
   <div class="layout">
-    <aside class="side">
+    <aside class="side" id="projects-sidebar">
       <button class="btn primary block" data-action="home">＋ New video</button>
       <div class="side-label">Projects</div>
       <nav id="projects"></nav>
@@ -30,12 +32,12 @@
     <main id="main"></main>
     <section class="chat" id="chat" hidden>
       <div class="chat-head">
-        <div><b>Claude</b> <span id="agent-state" class="muted">idle</span></div>
+        <div><b id="chat-head-name">Claude</b> <span id="agent-state" class="muted">idle</span></div>
         <button class="btn ghost sm" id="stop-btn" data-action="stop" hidden>■ Stop</button>
       </div>
       <div class="chat-log" id="chat-log"></div>
       <form class="chat-input" id="chat-form">
-        <textarea id="chat-text" rows="3" placeholder="Tell Claude what to change… (Enter to send, Shift+Enter for a new line)"></textarea>
+        <textarea id="chat-text" rows="3" placeholder="Tell the AI what to change… (Enter to send, Shift+Enter for a new line)"></textarea>
         <button class="btn primary" type="submit">Send</button>
       </form>
     </section>

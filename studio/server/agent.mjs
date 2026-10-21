@@ -1,12 +1,17 @@
 // Runs Claude Code (via the Agent SDK) for a project: one resumable session per project,
 // streamed to the browser as small events and saved to the project's log.
 import path from 'node:path';
+import net from 'node:net';
+import {spawn} from 'node:child_process';
 import {query} from '@anthropic-ai/claude-agent-sdk';
-import {REEL, STUDIO, DATA} from './paths.mjs';
+import {REEL, STUDIO, DATA, projectDir} from './paths.mjs';
 import {SYSTEM} from './prompts.mjs';
 import {getProject, saveProject, appendLog} from './projects.mjs';
+import {aiConfig, PROVIDERS} from './settings.mjs';
+import {runOpenAITurn} from './providers/openai.mjs';
 import {writeRegistry} from './remotion.mjs';
 
+const LOST = /No conversation found with session ID/i;
 const running = new Map(); // projectId -> AbortController
 export const isBusy = (id) => running.has(id);
 export const stopAgent = (id) => running.get(id)?.abort();
@@ -32,6 +37,29 @@ const canUseTool = async (tool, input) => {
 const AUTH_VARS = /^(ANTHROPIC_(API_KEY|AUTH_TOKEN|BASE_URL|.*_BASE_URL)|CLAUDE_CODE_(OAUTH_TOKEN|OAUTH_REFRESH_TOKEN|USE_BEDROCK|USE_VERTEX|USE_FOUNDRY|API_KEY_HELPER.*)|AWS_BEARER_TOKEN_BEDROCK)$/i;
 const localLoginEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AUTH_VARS.test(k)));
 
+// A proxy variable left behind by the tool that started the studio (sandboxed terminals and agent tools point
+// HTTP(S)_PROXY at a local port that dies with them) makes every Claude call fail with ECONNREFUSED.
+// Drop loopback proxies that nothing is listening on; keep real ones.
+const PROXY_VARS = /^(https?_proxy|all_proxy)$/i;
+const portOpen = (host, port) => new Promise((ok) => {
+  const s = net.connect({host, port, timeout: 1500});
+  s.once('connect', () => { s.destroy(); ok(true); });
+  s.once('error', () => ok(false));
+  s.once('timeout', () => { s.destroy(); ok(false); });
+});
+export const claudeEnv = async () => {
+  const env = localLoginEnv();
+  const dropped = [];
+  for (const k of Object.keys(env).filter((k) => PROXY_VARS.test(k))) {
+    let u; try { u = new URL(env[k].includes('://') ? env[k] : `http://${env[k]}`); } catch { continue; }
+    if (!/^(localhost|127\.\d+\.\d+\.\d+|\[?::1\]?)$/i.test(u.hostname)) continue;
+    if (!(await portOpen(u.hostname.replace(/^\[|\]$/g, ''), Number(u.port || 80)))) { dropped.push(`${k}=${env[k]}`); delete env[k]; }
+  }
+  if (dropped.length) console.log(`  ! Ignoring dead local proxy for Claude: ${dropped.join(', ')}`);
+  return env;
+};
+const NETWORK = /ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|Connection (refused|error)|network/i;
+
 const short = (s, n = 110) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const relPath = (f) => { const r = path.relative(REEL, String(f ?? '')); return (r.startsWith('..') ? path.relative(STUDIO, String(f)) : r).split(path.sep).join('/'); };
 const toolLabel = (name, i = {}) => {
@@ -49,6 +77,53 @@ const toolLabel = (name, i = {}) => {
   }
 };
 
+const runCodexTurn = ({project, prompt, model, signal, onText, onTool}) => new Promise((resolve, reject) => {
+  // A Codex thread keeps its original writable roots when resumed. Start a fresh
+  // thread once so projects created before this workspace layout gain their data dir.
+  if (project.codexWorkspaceVersion !== 2) {
+    if (project.codexSessionId) {
+      project.codexSessionHistory = [...(project.codexSessionHistory ?? []), project.codexSessionId];
+      project.codexSessionId = null;
+    }
+    project.codexWorkspaceVersion = 2;
+    saveProject(project);
+  }
+  const modelArgs = ['--model', model];
+  const args = project.codexSessionId
+    ? ['exec', 'resume', project.codexSessionId, `${SYSTEM}\n\n${prompt}`, '--json', ...modelArgs]
+    : ['exec', '--json', '--sandbox', 'workspace-write', '--cd', REEL, '--add-dir', projectDir(project.id), '--add-dir', path.join(STUDIO, 'presets'), ...modelArgs, `${SYSTEM}\n\n${prompt}`];
+  const child = spawn('codex', args, {cwd: REEL, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']});
+  let stdout = '', stderr = '', resultError = null, finished = false;
+  const finish = (error, value) => { if (finished) return; finished = true; signal?.removeEventListener('abort', abort); error ? reject(error) : resolve(value); };
+  const abort = () => child.kill();
+  if (signal?.aborted) abort(); else signal?.addEventListener('abort', abort, {once: true});
+  const parseLine = (line) => {
+    if (!line.trim()) return;
+    let e; try { e = JSON.parse(line); } catch { return; }
+    if (e.type === 'thread.started' && e.thread_id && project.codexSessionId !== e.thread_id) {
+      project.codexSessionId = e.thread_id; saveProject(project);
+    }
+    const item = e.item ?? {};
+    if (item.type === 'agent_message' && item.text) onText(item.text);
+    else if (item.type === 'command_execution') onTool('Bash', {command: item.command, description: item.command});
+    else if (item.type === 'file_change') onTool('Edit', {file_path: item.changes?.[0]?.path ?? 'project files'});
+    if (e.type === 'turn.failed') resultError = e.error?.message ?? JSON.stringify(e.error ?? e);
+  };
+  child.stdout.on('data', (chunk) => {
+    stdout += chunk.toString();
+    const lines = stdout.split(/\r?\n/); stdout = lines.pop() ?? '';
+    for (const line of lines) parseLine(line);
+  });
+  child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+  child.on('error', (e) => finish(e));
+  child.on('close', (code) => {
+    if (stdout.trim()) parseLine(stdout);
+    if (signal?.aborted) return finish(null, {ok: false, error: 'Stopped.'});
+    if (code !== 0 || resultError) return finish(null, {ok: false, error: resultError || stderr.trim() || `Codex exited with code ${code}`});
+    finish(null, {ok: true});
+  });
+});
+
 /**
  * Run one agent turn. `emit(event)` gets {type:'agent', projectId, kind:'text'|'tool'|'status'|'done'|'error', ...}.
  * Resolves when the turn ends.
@@ -63,42 +138,103 @@ export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) =>
   emit?.({type: 'agent', projectId, kind: 'user', text: label ?? prompt});
   send({kind: 'status', busy: true});
   let ok = false;
+  const cfg = aiConfig();
   try {
-    const q = query({
-      prompt,
-      options: {
-        cwd: REEL,
-        additionalDirectories: [STUDIO],
-        resume: p.sessionId ?? undefined,
-        systemPrompt: {type: 'preset', preset: 'claude_code', append: SYSTEM},
-        settingSources: ['project'],
-        permissionMode: 'default',
-        canUseTool,
-        abortController: ac,
-        model: process.env.STUDIO_MODEL || undefined,
-        env: localLoginEnv(),
-        title: `Video Studio · ${p.title}`,
-      },
-    });
-    for await (const m of q) {
-      if (m.type === 'system' && m.subtype === 'init' && m.session_id && p.sessionId !== m.session_id) {
-        p = getProject(projectId); p.sessionId = m.session_id; saveProject(p);
-      } else if (m.type === 'assistant' && !m.parent_tool_use_id) {
-        for (const b of m.message.content ?? []) {
-          if (b.type === 'text' && b.text.trim()) send({kind: 'text', text: b.text.trim()});
-          else if (b.type === 'tool_use') send({kind: 'tool', tool: b.name, text: toolLabel(b.name, b.input)});
+    if (cfg.provider === 'codex') {
+      if (!cfg.model) throw new Error('Choose a model ID that is available in your Codex account. Set it in AI model on the Studio home page.');
+      const r = await runCodexTurn({
+        project: p, prompt, model: cfg.model, signal: ac.signal,
+        onText: (text) => send({kind: 'text', text}),
+        onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
+      });
+      ok = r.ok;
+      if (!ok) send({kind: 'error', text: r.error});
+      return ok;
+    }
+    if (cfg.provider !== 'claude') {
+      // Any OpenAI-compatible model: same prompts, tools and permission rules, our own loop.
+      const r = await runOpenAITurn({
+        cfg, prompt, systemAppend: SYSTEM, cwd: REEL, additionalDirectories: [STUDIO],
+        sessionFile: path.join(projectDir(projectId), 'agent-session.json'),
+        signal: ac.signal, canUseTool,
+        onText: (text) => send({kind: 'text', text}),
+        onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
+      });
+      ok = r.ok;
+      p = getProject(projectId); p.tokens = {input: (p.tokens?.input ?? 0) + r.usage.input, output: (p.tokens?.output ?? 0) + r.usage.output}; saveProject(p);
+      if (!ok) send({kind: 'error', text: /401|403|api key|unauthor/i.test(r.error ?? '') ? `${r.error}
+Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home page.` : r.error});
+      return ok;
+    }
+    const env = await claudeEnv();
+    // Up to 3 tries: a saved session that no longer exists restarts fresh, a network blip retries once.
+    let lostRetried = false, netRetried = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let failure = null; // error text of this try
+      let answered = false; // a real (non-error) assistant message arrived
+      try {
+        const q = query({
+          prompt,
+          options: {
+            cwd: REEL,
+            additionalDirectories: [STUDIO],
+            resume: p.sessionId ?? undefined,
+            systemPrompt: {type: 'preset', preset: 'claude_code', append: SYSTEM},
+            settingSources: ['project'],
+            permissionMode: 'default',
+            canUseTool,
+            abortController: ac,
+            model: process.env.STUDIO_MODEL || undefined,
+            env,
+            title: `Video Studio · ${p.title}`,
+          },
+        });
+        for await (const m of q) {
+          if (m.type === 'assistant') {
+            // API failures arrive as a synthetic assistant message with `error` set and a session that was never
+            // saved. Only remember the session once Claude really answered, or the next run fails to resume it.
+            if (m.error || m.message?.model === '<synthetic>') continue;
+            answered = true;
+            if (m.session_id && p.sessionId !== m.session_id) { p = getProject(projectId); p.sessionId = m.session_id; saveProject(p); }
+            if (m.parent_tool_use_id) continue;
+            for (const b of m.message.content ?? []) {
+              if (b.type === 'text' && b.text.trim()) send({kind: 'text', text: b.text.trim()});
+              else if (b.type === 'tool_use') send({kind: 'tool', tool: b.name, text: toolLabel(b.name, b.input)});
+            }
+          } else if (m.type === 'result') {
+            ok = m.subtype === 'success' && !m.is_error;
+            p = getProject(projectId); p.cost = (p.cost ?? 0) + (m.total_cost_usd ?? 0); saveProject(p);
+            if (!ok) failure = m.result || m.errors?.join('\n') || `Stopped (${m.subtype})`;
+          }
         }
-      } else if (m.type === 'result') {
-        ok = m.subtype === 'success' && !m.is_error;
-        p = getProject(projectId); p.cost = (p.cost ?? 0) + (m.total_cost_usd ?? 0); saveProject(p);
-        if (!ok) {
-          const text = m.result || m.errors?.join('\n') || `Stopped (${m.subtype})`;
-          send({kind: 'error', text: /log ?in|auth|401|credential/i.test(text) ? `${text}\nSign in to Claude Code on this PC: run "claude" in a terminal and type /login, then try again.` : text});
-        }
+      } catch (e) {
+        if (ac.signal.aborted) throw e;
+        failure = String(e.message ?? e);
       }
+      if (!failure || ok) break;
+      if (LOST.test(failure) && !lostRetried) {
+        lostRetried = true;
+        p = getProject(projectId); p.sessionId = null; saveProject(p);
+        send({kind: 'text', text: 'The earlier Claude session for this project was not found, so I started a fresh one.'});
+        continue;
+      }
+      if (NETWORK.test(failure) && !answered && !netRetried) {
+        netRetried = true;
+        send({kind: 'text', text: 'Could not reach Claude, trying again in 5 seconds…'});
+        await new Promise((r) => setTimeout(r, 5000));
+        if (ac.signal.aborted) throw new Error('Stopped.');
+        continue;
+      }
+      const hint = LOST.test(failure) ? ''
+        : NETWORK.test(failure) ? '\nThis PC could not reach Anthropic. Check the internet / VPN, then restart Video Studio from a normal terminal (a proxy set by the tool that started it can block Claude).'
+        : /\blog ?in\b|not (logged|signed) in|authenticat|\b401\b|credential/i.test(failure) ? '\nSign in to Claude Code on this PC: run "claude" in a terminal and type /login, then try again.' : '';
+      send({kind: 'error', text: `${failure}${hint}`});
+      break;
     }
   } catch (e) {
-    send({kind: 'error', text: ac.signal.aborted ? 'Stopped.' : String(e.message ?? e)});
+    const msg = String(e.message ?? e);
+    send({kind: 'error', text: ac.signal.aborted ? 'Stopped.' : cfg.provider !== 'claude' && /401|403|unauthor|invalid.*key/i.test(msg) ? `${msg}
+Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home page.` : msg});
   } finally {
     running.delete(projectId);
     try { writeRegistry(); } catch {}

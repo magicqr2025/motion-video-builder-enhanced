@@ -24,11 +24,13 @@ h3 { font-size: 15px; font-weight: 700; }
 .top-mid { flex: 1; color: #C9D3F2; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-mid b { color: #fff; font-weight: 600; }
 .top-right { display: flex; gap: 10px; align-items: center; }
+.panel-toggle { font-size: 11px !important; padding: 6px 9px !important; }
 .top .btn.ghost { color: #fff; border-color: rgba(255,255,255,.25); }
 .top .pill { background: rgba(255,255,255,.12); color: #fff; }
 
 /* ---------- layout ---------- */
 .layout { display: flex; height: calc(100vh - 58px); }
+.layout.left-collapsed .side, .layout.right-collapsed .chat { display: none; }
 .side { width: 230px; flex: none; padding: 16px 12px; border-right: 1px solid var(--line); background: #fff; overflow-y: auto; }
 .side-label { margin: 20px 8px 8px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 #projects a { display: block; padding: 9px 10px; border-radius: 10px; text-decoration: none; color: var(--ink); margin-bottom: 2px; }

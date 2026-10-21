@@ -1,0 +1,90 @@
+{
+  "_help": {
+    "Hook.question": "max ~40 chars, wraps to two lines",
+    "End.cta": "button text, max ~28 chars",
+    "Profile.items": "six short labels, said in this order in the voiceover",
+    "Tagline": "three short lines, said in this order"
+  },
+  "Brand": {
+    "product": "Way CRM",
+    "by": "by MagicBolt ai",
+    "site": "waycrm.in"
+  },
+  "Hook": {
+    "kicker": "Customers message you all day",
+    "question": "How many chats slip through the cracks?",
+    "missed": "Missed",
+    "meet": "Meet"
+  },
+  "Inbox": {
+    "title": "Shared WhatsApp Inbox",
+    "sub": "Every chat, one team inbox",
+    "alert": "Instant alerts",
+    "noWait": "No customer waits"
+  },
+  "Bots": {
+    "title": "24/7 Chatbots & Automation",
+    "sub": "Answer, qualify, follow up",
+    "badge": "24/7",
+    "drip": "Templates & drip follow-ups"
+  },
+  "Broadcast": {
+    "title": "Broadcasts with live reports",
+    "sub": "Reach hundreds in one send",
+    "recipients": "Recipients",
+    "delivered": "Delivered",
+    "read": "Read"
+  },
+  "Leads": {
+    "title": "Lead Board & Pipeline",
+    "sub": "Every lead, assigned and moving",
+    "sources": [
+      "Facebook ads",
+      "Website",
+      "Walk-ins"
+    ],
+    "assigned": "Assigned to Rahul"
+  },
+  "Profile": {
+    "title": "One Customer Profile",
+    "sub": "Everything tracked in one place",
+    "items": [
+      "Follow-ups",
+      "Meetings",
+      "Booking links",
+      "Deals",
+      "Payments",
+      "Support tickets"
+    ]
+  },
+  "Team": {
+    "title": "Team Chat & Projects",
+    "chips": [
+      "Tasks",
+      "Deadlines",
+      "Approvals"
+    ]
+  },
+  "Know": {
+    "title": "Staff Performance",
+    "sub": "Calls, meetings and sales vs target",
+    "salesLabel": "Sales vs target",
+    "of": "of ₹50L"
+  },
+  "Control": {
+    "title": "Control Who Sees What",
+    "sub": "Roles, access and AI answers",
+    "aiLabel": "Ask AI",
+    "question": "Who sold the most this month?",
+    "answer": "Priya Sharma · ₹12.4L, 103% of target"
+  },
+  "Tagline": [
+    "Reply faster.",
+    "Sell more.",
+    "Know everything."
+  ],
+  "End": {
+    "cta": "Book your free demo today",
+    "lead": "WhatsApp CRM for growing teams"
+  }
+}
