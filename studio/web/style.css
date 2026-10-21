@@ -94,8 +94,8 @@ label.f > em { display: block; font-style: normal; font-size: 11px; color: var(-
 .preset .body p { margin: 0; font-size: 12px; color: var(--slate); line-height: 1.5; flex: 1; }
 
 /* ---------- tabs ---------- */
-.tabs { display: flex; gap: 6px; margin: 18px 0 22px; padding: 5px; background: #fff; border-radius: 14px; box-shadow: var(--shadow); width: fit-content; }
-.tabs button { font: inherit; font-weight: 600; font-size: 13px; border: 0; background: transparent; padding: 9px 16px; border-radius: 10px; color: var(--slate); cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.tabs { display: flex; gap: 6px; margin: 18px 0 22px; padding: 5px; background: #fff; border-radius: 14px; box-shadow: var(--shadow); width: fit-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.tabs button { font: inherit; font-weight: 600; font-size: 13px; border: 0; background: transparent; padding: 9px 16px; border-radius: 10px; color: var(--slate); cursor: pointer; display: flex; gap: 8px; align-items: center; flex: none; }
 .tabs button .k { width: 20px; height: 20px; border-radius: 6px; background: var(--soft); display: grid; place-items: center; font-size: 11px; }
 .tabs button.on { background: var(--navy); color: #fff; }
 .tabs button.on .k { background: var(--gold); color: var(--navy); }
@@ -197,12 +197,19 @@ table.sb td.tm { white-space: nowrap; font-variant-numeric: tabular-nums; color:
 
 @media (max-width: 1200px) { .chat { width: 320px; } .g4 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 900px) {
-  body { overflow: auto; height: auto; }
+  body { overflow-x: hidden; overflow-y: auto; height: auto; }
   .layout { flex-direction: column; height: auto; }
   .side, .chat { width: auto; border: 0; }
   main { padding: 18px 16px 80px; }
   .g2, .g3, .g4 { grid-template-columns: 1fr; }
   .chat { height: 70vh; }
+}
+@media (max-width: 640px) {
+  .top { flex-wrap: wrap; height: auto; min-height: 58px; padding: 10px 14px; row-gap: 8px; }
+  .top-mid { display: none; }
+  .top-right { flex: 1 1 100%; justify-content: flex-end; }
+  #open-remotion { display: none; }
+  .side { max-height: 160px; overflow-y: auto; }
 }
 
 /* ---------- text tab ---------- */

@@ -23,10 +23,15 @@ const STATUS = {
 };
 const SCENE_COLORS = ['#1354BC', '#1582D5', '#F7941D', '#7B3FF2', '#ED1C6F', '#16A34A', '#0E1B4D', '#E0A800'];
 
+// On a phone/narrow screen, a first-time visitor has no saved preference yet: start with the
+// projects and chat panels collapsed so the page they came for isn't buried below both of them.
+const storedLeft = localStorage.getItem('studio-left-collapsed');
+const storedRight = localStorage.getItem('studio-right-collapsed');
+const narrow = window.matchMedia('(max-width: 900px)').matches;
 const S = {
   state: null, cur: null, tab: 'brief', editing: false, renderJob: null, jobText: {},
-  leftCollapsed: localStorage.getItem('studio-left-collapsed') === '1',
-  rightCollapsed: localStorage.getItem('studio-right-collapsed') === '1',
+  leftCollapsed: storedLeft != null ? storedLeft === '1' : narrow,
+  rightCollapsed: storedRight != null ? storedRight === '1' : narrow,
 };
 const applyPanelState = () => {
   const layout = $('.layout');
@@ -63,14 +68,20 @@ const loadProject = async (id) => {
 };
 const bestTab = (p) => ({brief: 'brief', concepting: 'concepts', concepts: 'concepts', building: 'build', review: 'build', rendering: 'render', done: 'render'}[p.status] ?? 'brief');
 
+// Replacing #main's content leaves its scroll position as it was (the browser doesn't reset it just
+// because the children changed), so without this a new page can silently open mid-scroll: e.g. scroll
+// down the home page to click a preset near the bottom, and the project you land on opens half-scrolled.
+const scrollMainTop = () => { const m = $('#main'); if (m) m.scrollTop = 0; };
+
 const load = async () => {
   const r = route();
   await loadState().catch((e) => toast(e.message));
-  if (!r.id) { S.cur = null; renderHome(); renderChat(); return; }
+  if (!r.id) { S.cur = null; renderHome(); renderChat(); scrollMainTop(); return; }
   try { await loadProject(r.id); } catch { go(null); return; }
   S.tab = r.tab || bestTab(S.cur.project);
   renderProject();
   renderChat();
+  scrollMainTop();
 };
 
 // ---------- sidebar ----------
