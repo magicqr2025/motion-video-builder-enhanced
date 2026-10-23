@@ -145,6 +145,9 @@ const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool,
   });
 });
 
+// A tool call as a log event. Claude's TodoWrite list is kept too, so the Build page can show its own plan and what is ticked off.
+const toolEvent = (name, input) => ({kind: 'tool', tool: name, text: toolLabel(name, input), ...(name === 'TodoWrite' && Array.isArray(input?.todos) ? {todos: input.todos.map((t) => ({content: String(t.content ?? ''), status: t.status, activeForm: t.activeForm}))} : {})});
+
 /**
  * Run one agent turn. `emit(event)` gets {type:'agent', projectId, kind:'text'|'tool'|'status'|'done'|'error', ...}.
  * Resolves when the turn ends.
@@ -174,7 +177,7 @@ export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) =>
         project: p, prompt, model: cfg.model, signal: ac.signal,
         onText: (text) => send({kind: 'text', text}),
         onStatus: (text) => send({kind: 'text', text}),
-        onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
+        onTool: (name, input) => send(toolEvent(name, input)),
         onUsage: (u) => recordUsage(projectId, u, 0, send, proc),
       });
       ok = r.ok;
@@ -188,7 +191,7 @@ export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) =>
         sessionFile: path.join(projectDir(projectId), 'agent-session.json'),
         signal: ac.signal, canUseTool,
         onText: (text) => send({kind: 'text', text}),
-        onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
+        onTool: (name, input) => send(toolEvent(name, input)),
       });
       ok = r.ok;
       recordUsage(projectId, {input: r.usage.input, output: r.usage.output, cacheRead: 0, cacheWrite: 0, context: 0}, 0, send, proc);
@@ -233,7 +236,7 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
             if (m.parent_tool_use_id) continue;
             for (const b of m.message.content ?? []) {
               if (b.type === 'text' && b.text.trim()) send({kind: 'text', text: b.text.trim()});
-              else if (b.type === 'tool_use') send({kind: 'tool', tool: b.name, text: toolLabel(b.name, b.input)});
+              else if (b.type === 'tool_use') send(toolEvent(b.name, b.input));
             }
           } else if (m.type === 'result') {
             ok = m.subtype === 'success' && !m.is_error;

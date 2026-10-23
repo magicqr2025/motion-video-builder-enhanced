@@ -1,445 +1,477 @@
 {
- "Title": {
-  "eyebrow": "MagicBolt Tutorial",
-  "title": "Run your entire agency from one dashboard",
-  "sub": "A quick walkthrough of the Agency OS panel"
- },
- "SignUp": {
-  "eyebrow": "Get started",
-  "headline": "Sign up, then log in",
-  "sub": "magicbolt.ai, then sign up",
-  "points": [
-   "Go to magicbolt.ai",
-   "Create your agency account",
-   "Log in with email & password"
-  ],
-  "cardTitle": "Welcome to MagicBolt",
-  "cardSub": "Your agency workspace",
-  "tabs": [
-   "Sign up",
-   "Log in"
-  ],
-  "emailLabel": "Email",
-  "email": "agency@yourbrand.com",
-  "passwordLabel": "Password",
-  "password": "••••••••••",
-  "signupBtn": "Create account",
-  "loginBtn": "Log in",
-  "caption": "magicbolt.ai, then sign up and log in",
-  "badge": "Start"
- },
- "Dashboards": {
-  "eyebrow": "Two dashboards",
-  "headline": "Agency + Client",
-  "sub": "One for your agency, one for your clients",
-  "points": [
-   "Agency dashboard",
-   "Client dashboard"
-  ],
-  "cards": [
-   {
-    "title": "Agency dashboard",
-    "items": [
-     "All your clients",
-     "Plans & billing",
-     "Leads & messaging"
-    ]
-   },
-   {
-    "title": "Client dashboard",
-    "items": [
-     "Google profile & reviews",
-     "Posts & AI content",
-     "Connections"
-    ]
-   }
-  ],
-  "caption": "Two dashboards: Agency + Client",
-  "badge": "Dashboards"
- },
- "Dashboard": {
-  "eyebrow": "Agency dashboard",
-  "headline": "Everything at a glance",
-  "sub": "Your whole agency on one screen",
-  "points": [
-   "Your clients",
-   "Google profiles & locations",
-   "Recent businesses"
-  ],
-  "welcome": "Welcome to Agency OS",
-  "welcomeSub": "Manage · Sell · Automate",
-  "addClient": "Add client",
-  "addBusiness": "Add business",
-  "stats": [
-   {
-    "label": "Monthly revenue (MRR)",
-    "prefix": "₹",
-    "foot": "ARPU ₹1,737"
-   },
-   {
-    "label": "Total clients",
-    "prefix": "",
-    "foot": "Managed client accounts"
-   },
-   {
-    "label": "Google profiles & locations",
-    "prefix": "",
-    "foot": "37 of 37 active"
-   },
-   {
-    "label": "Subscription status",
-    "prefix": "",
-    "foot": "Active plans"
-   }
-  ],
-  "recentClients": "Recent clients",
-  "recentBusinesses": "Recent businesses",
-  "clients": [
-   "Sunrise Dental Care",
-   "Green Leaf Café",
-   "Urban Fit Gym"
-  ],
-  "businesses": [
-   "Bloom Salon & Spa",
-   "City Paws Vet Clinic",
-   "Royal Spice Kitchen"
-  ],
-  "active": "Active",
-  "login": "Log in",
-  "caption": "Clients, Google profiles & locations, recent businesses",
-  "badge": "Dashboard"
- },
- "Clients": {
-  "eyebrow": "Clients",
-  "headline": "Manage every client",
-  "sub": "Jump in or let go in one click",
-  "points": [
-   "Log into any client panel",
-   "Disconnect old clients"
-  ],
-  "title": "Clients",
-  "columns": [
-   "Client",
-   "Businesses",
-   "Status"
-  ],
-  "rows": [
-   {
-    "name": "Sunrise Dental Care",
-    "count": "3"
-   },
-   {
-    "name": "Green Leaf Café",
-    "count": "1"
-   },
-   {
-    "name": "Urban Fit Gym",
-    "count": "2"
-   },
-   {
-    "name": "Bloom Salon & Spa",
-    "count": "4"
-   }
-  ],
-  "active": "Active",
-  "login": "Log in",
-  "disconnect": "Disconnect",
-  "opened": "Opening Sunrise Dental Care",
-  "openedSub": "Client panel",
-  "removed": "Client disconnected",
-  "caption": "Log into any client's panel or disconnect clients",
-  "badge": "Clients"
- },
- "Connections": {
-  "eyebrow": "Connections",
-  "headline": "See every connection",
-  "sub": "Which services each business uses",
-  "points": [
-   "Google Business Profile",
-   "Meta"
-  ],
-  "title": "Connections",
-  "columns": [
-   "Business",
-   "Services"
-  ],
-  "rows": [
-   "Sunrise Dental Care",
-   "Green Leaf Café",
-   "Urban Fit Gym",
-   "Royal Spice Kitchen"
-  ],
-  "google": "Google Business Profile",
-  "meta": "Meta",
-  "connected": "Connected",
-  "caption": "Connections: Google Business Profile, Meta",
-  "badge": "Connections"
- },
- "AI": {
-  "eyebrow": "AI Content",
-  "headline": "Generate AI content",
-  "sub": "Right inside the panel",
-  "points": [
-   "Describe the post",
-   "Generate in seconds"
-  ],
-  "title": "AI content",
-  "promptLabel": "What should we write?",
-  "prompt": "Diwali offer post for Sunrise Dental Care",
-  "generate": "Generate",
-  "resultTitle": "Your post",
-  "result": "This Diwali, light up your smile! Flat 20% off teeth whitening at Sunrise Dental Care. Book your visit today.",
-  "caption": "Generate AI content right here",
-  "badge": "AI Content"
- },
- "Plans": {
-  "eyebrow": "Subscriptions",
-  "headline": "Build custom plans",
-  "sub": "Your pricing, your rules",
-  "points": [
-   "Pricing & currency",
-   "Billing interval & free trial",
-   "Usage limits"
-  ],
-  "formTitle": "Create new plan",
-  "nameLabel": "Plan name",
-  "name": "Growth",
-  "priceLabel": "Price",
-  "price": "999",
-  "currencyLabel": "Currency",
-  "currency": "INR ₹",
-  "intervalLabel": "Billing interval",
-  "intervals": [
-   "Monthly",
-   "Yearly",
-   "One-time"
-  ],
-  "trialLabel": "Free trial · 14 days",
-  "limitsTitle": "Usage limits",
-  "limits": [
-   "Locations · 5",
-   "AI posts · 100 / month"
-  ],
-  "save": "Save plan",
-  "caption": "Custom plans: pricing, currency, interval, trial, limits",
-  "badge": "Subscriptions"
- },
- "Tiers": {
-  "eyebrow": "Subscriptions",
-  "headline": "Higher limits = higher price",
-  "sub": "Then assign each plan to the right customer",
-  "points": [
-   "Set limits per plan",
-   "Price grows with limits",
-   "Assign to a customer"
-  ],
-  "plans": [
-   {
-    "name": "Starter",
-    "price": "₹499",
-    "limits": [
-     "1 location",
-     "30 AI posts"
-    ]
-   },
-   {
+  "Title": {
+    "eyebrow": "MagicBolt ai Tutorial",
+    "title": "Walkthrough of the Agency Panel",
+    "sub": "Everything in One Agency OS "
+  },
+  "SignUp": {
+    "eyebrow": "Get started",
+    "headline": "Sign up & log in",
+    "sub": "visit : magicbolt.ai",
+    "points": [
+      "Go to magicbolt.ai",
+      "Signup your agency account",
+      "Log in with email & password"
+    ],
+    "cardTitle": "Welcome to MagicBolt",
+    "cardSub": "Your agency workspace",
+    "tabs": [
+      "Sign up",
+      "Log in"
+    ],
+    "emailLabel": "Email",
+    "email": "agency@yourbrand.com",
+    "passwordLabel": "Password",
+    "password": "••••••••••",
+    "signupBtn": "Create account",
+    "loginBtn": "Log in",
+    "caption": "magicbolt.ai, then sign up and log in",
+    "badge": "Start"
+  },
+  "Dashboards": {
+    "eyebrow": "Two dashboards",
+    "headline": "Agency + Client",
+    "sub": "One for your agency, one for your clients",
+    "points": [
+      "Agency dashboard",
+      "Client dashboard"
+    ],
+    "cards": [
+      {
+        "title": "Agency dashboard",
+        "items": [
+          "All your clients",
+          "Plans & billing",
+          "Leads & messaging"
+        ]
+      },
+      {
+        "title": "Client dashboard",
+        "items": [
+          "Google profile & reviews",
+          "Posts & AI content",
+          "Connections"
+        ]
+      }
+    ],
+    "caption": "Two dashboards: Agency + Client",
+    "badge": "Dashboards"
+  },
+  "Dashboard": {
+    "eyebrow": "Agency dashboard",
+    "headline": "Everything at a glance",
+    "sub": "Your whole agency on one screen",
+    "points": [
+      "Your clients",
+      "Google profiles & locations",
+      "Recent businesses"
+    ],
+    "welcome": "Welcome to Agency OS",
+    "welcomeSub": "Manage · Sell · Automate",
+    "addClient": "Add client",
+    "addBusiness": "Add business",
+    "stats": [
+      {
+        "label": "Monthly revenue (MRR)",
+        "prefix": "₹",
+        "foot": "ARPU ₹1,737"
+      },
+      {
+        "label": "Total clients",
+        "prefix": "",
+        "foot": "Managed client accounts"
+      },
+      {
+        "label": "Google profiles & locations",
+        "prefix": "",
+        "foot": "37 of 37 active"
+      },
+      {
+        "label": "Subscription status",
+        "prefix": "",
+        "foot": "Active plans"
+      }
+    ],
+    "recentClients": "Recent clients",
+    "recentBusinesses": "Recent businesses",
+    "clients": [
+      "Sunrise Dental Care",
+      "Green Leaf Café",
+      "Urban Fit Gym"
+    ],
+    "businesses": [
+      "Bloom Salon & Spa",
+      "City Paws Vet Clinic",
+      "Royal Spice Kitchen"
+    ],
+    "active": "Active",
+    "login": "Log in",
+    "caption": "Clients, Google profiles & locations, recent businesses",
+    "badge": "Dashboard"
+  },
+  "Clients": {
+    "eyebrow": "Clients",
+    "headline": "Manage every client",
+    "sub": "Jump in or let go in one click",
+    "points": [
+      "Log into any client panel",
+      "Disconnect old clients"
+    ],
+    "title": "Clients",
+    "columns": [
+      "Client",
+      "Businesses",
+      "Status"
+    ],
+    "rows": [
+      {
+        "name": "Sunrise Dental Care",
+        "count": "3"
+      },
+      {
+        "name": "Green Leaf Café",
+        "count": "1"
+      },
+      {
+        "name": "Urban Fit Gym",
+        "count": "2"
+      },
+      {
+        "name": "Bloom Salon & Spa",
+        "count": "4"
+      }
+    ],
+    "active": "Active",
+    "login": "Log in",
+    "disconnect": "Disconnect",
+    "opened": "Opening Sunrise Dental Care",
+    "openedSub": "Client panel",
+    "removed": "Client disconnected",
+    "caption": "Log into any client's panel or disconnect clients",
+    "badge": "Clients"
+  },
+  "Connections": {
+    "eyebrow": "Connections",
+    "headline": "See every connection",
+    "sub": "Which services each business uses",
+    "points": [
+      "Google Business Profile",
+      "Meta"
+    ],
+    "title": "Connections",
+    "columns": [
+      "Business",
+      "Services"
+    ],
+    "rows": [
+      "Sunrise Dental Care",
+      "Green Leaf Café",
+      "Urban Fit Gym",
+      "Royal Spice Kitchen"
+    ],
+    "google": "Google Business Profile",
+    "meta": "Meta",
+    "connected": "Connected",
+    "caption": "Connections: Google Business Profile, Meta",
+    "badge": "Connections"
+  },
+  "AI": {
+    "eyebrow": "AI Content",
+    "headline": "Generate AI content",
+    "sub": "Right inside the panel",
+    "points": [
+      "Describe the post",
+      "Generate in seconds"
+    ],
+    "title": "AI content",
+    "promptLabel": "What should we write?",
+    "prompt": "Diwali offer post for Sunrise Dental Care",
+    "generate": "Generate",
+    "resultTitle": "Your post",
+    "result": "This Diwali, light up your smile! Flat 20% off teeth whitening at Sunrise Dental Care. Book your visit today.",
+    "caption": "Generate AI content right here",
+    "badge": "AI Content"
+  },
+  "Plans": {
+    "eyebrow": "Subscriptions",
+    "headline": "Build custom plans",
+    "sub": "Your pricing, your rules",
+    "points": [
+      "Pricing & currency",
+      "Billing interval & free trial",
+      "Usage limits"
+    ],
+    "formTitle": "Create new plan",
+    "nameLabel": "Plan name",
     "name": "Growth",
-    "price": "₹999",
+    "priceLabel": "Price",
+    "price": "999",
+    "currencyLabel": "Currency",
+    "currency": "INR ₹",
+    "intervalLabel": "Billing interval",
+    "intervals": [
+      "Monthly",
+      "Yearly",
+      "One-time"
+    ],
+    "trialLabel": "Free trial · 14 days",
+    "limitsTitle": "Usage limits",
     "limits": [
-     "5 locations",
-     "100 AI posts"
-    ]
-   },
-   {
-    "name": "Pro",
-    "price": "₹1,999",
-    "limits": [
-     "15 locations",
-     "300 AI posts"
-    ]
-   }
+      "Locations · 5",
+      "AI posts · 100 / month"
+    ],
+    "save": "Save plan",
+    "caption": "Custom plans: pricing, currency, interval, trial, limits",
+    "badge": "Subscriptions"
+  },
+  "Tiers": {
+    "eyebrow": "Subscriptions",
+    "headline": "Higher limits = higher price",
+    "sub": "Then assign each plan to the right customer",
+    "points": [
+      "Set limits per plan",
+      "Price grows with limits",
+      "Assign to a customer"
+    ],
+    "plans": [
+      {
+        "name": "Starter",
+        "price": "₹499",
+        "limits": [
+          "1 location",
+          "30 AI posts"
+        ]
+      },
+      {
+        "name": "Growth",
+        "price": "₹999",
+        "limits": [
+          "5 locations",
+          "100 AI posts"
+        ]
+      },
+      {
+        "name": "Pro",
+        "price": "₹1,999",
+        "limits": [
+          "15 locations",
+          "300 AI posts"
+        ]
+      }
+    ],
+    "perMonth": "/ month",
+    "assignTitle": "Assign plan",
+    "customerLabel": "Customer",
+    "customer": "Green Leaf Café",
+    "planLabel": "Plan",
+    "plan": "Growth",
+    "assign": "Assign",
+    "done": "Growth plan assigned",
+    "doneSub": "Green Leaf Café",
+    "caption": "Higher limits = higher price",
+    "badge": "Plans"
+  },
+  "Billing": {
+    "eyebrow": "Billing",
+    "headline": "Track your revenue",
+    "points": [
+      "MRR & ARPU",
+      "Active subscriptions",
+      "Paid · Partial · Overdue"
+    ],
+    "title": "Billing",
+    "sub": "Revenue and invoices across every client",
+    "metrics": [
+      {
+        "label": "MRR",
+        "prefix": "₹"
+      },
+      {
+        "label": "ARPU",
+        "prefix": "₹"
+      },
+      {
+        "label": "Active subscriptions",
+        "prefix": ""
+      },
+      {
+        "label": "Overdue",
+        "prefix": "₹"
+      }
+    ],
+    "invoicesTitle": "Invoices",
+    "columns": [
+      "Invoice",
+      "Client",
+      "Amount",
+      "Status"
+    ],
+    "invoices": [
+      {
+        "id": "INV-1042",
+        "client": "Sunrise Dental Care",
+        "amount": "₹1,999",
+        "status": "Paid"
+      },
+      {
+        "id": "INV-1043",
+        "client": "Green Leaf Café",
+        "amount": "₹2,499",
+        "status": "Partial"
+      },
+      {
+        "id": "INV-1044",
+        "client": "Urban Fit Gym",
+        "amount": "₹999",
+        "status": "Overdue"
+      },
+      {
+        "id": "INV-1045",
+        "client": "Bloom Salon & Spa",
+        "amount": "₹1,499",
+        "status": "Paid"
+      }
+    ],
+    "toast": "Invoices: Paid, Partial, Overdue",
+    "caption": "Billing: MRR, ARPU, active subscriptions, invoices",
+    "badge": "Billing"
+  },
+  "Leads": {
+    "eyebrow": "Lead Center",
+    "headline": "Find new clients",
+    "sub": "Businesses from Google by category & location",
+    "points": [
+      "Pick a category",
+      "Choose a location",
+      "Call them directly"
+    ],
+    "categoryLabel": "Category",
+    "category": "Dentist",
+    "locationLabel": "Location",
+    "location": "Pune, Maharashtra",
+    "search": "Search",
+    "results": [
+      "Smile Studio Dental",
+      "Bright Teeth Clinic",
+      "Pearl Dental Care",
+      "Happy Smiles Centre"
+    ],
+    "areas": [
+      "Kothrud",
+      "Baner",
+      "Viman Nagar",
+      "Aundh"
+    ],
+    "call": "Call",
+    "notify": "24 businesses found",
+    "notifySub": "Dentist · Pune",
+    "caption": "Lead Center: businesses from Google by category & location",
+    "badge": "Leads"
+  },
+  "Bulk": {
+    "eyebrow": "Bulk messaging",
+    "headline": "Broadcast to customers",
+    "sub": "One message, every customer",
+    "points": [
+      "Pick your audience",
+      "Write once",
+      "Send to all"
+    ],
+    "title": "New broadcast",
+    "toLabel": "To",
+    "audience": [
+      "All customers",
+      "128 contacts"
+    ],
+    "messageLabel": "Message",
+    "message": "Hi! Our Diwali offer is live: 20% off this week. Reply YES to book.",
+    "send": "Send broadcast",
+    "sent": "Sent to 128 customers",
+    "sentSub": "Bulk messaging",
+    "caption": "Bulk messaging: broadcast to your customers",
+    "badge": "Broadcast"
+  },
+  "Integrations": {
+    "eyebrow": "Integrations",
+    "headline": "Integrations",
+    "sub": "Each one has its own video",
+    "points": [
+      "Covered in their own videos"
+    ],
+    "items": [
+      "Google Business Profile",
+      "Meta",
+      "WhatsApp",
+      "WordPress",
+      "Pinterest",
+      "Reddit"
+    ],
+    "watch": "Watch video",
+    "caption": "Integrations: covered in their own videos",
+    "badge": "Integrations"
+  },
+  "Whitelabel": {
+    "eyebrow": "Whitelabel",
+    "headline": "Make it your brand",
+    "sub": "Your name, your logo, your domain",
+    "points": [
+      "Brand name & logo",
+      "Your own panel domain",
+      "Add one DNS record"
+    ],
+    "title": "Whitelabel settings",
+    "brandTitle": "Brand",
+    "nameLabel": "Brand name",
+    "name": "Your Brand Agency",
+    "domainLabel": "Panel domain",
+    "domain": "app.yourbrand.com",
+    "colorsLabel": "Brand colours",
+    "save": "Save",
+    "dnsTitle": "DNS settings",
+    "dnsSub": "Add this record at your domain provider",
+    "typeLabel": "TYPE",
+    "type": "CNAME",
+    "hostLabel": "NAME / HOST",
+    "host": "app",
+    "targetLabel": "VALUE / TARGET",
+    "target": "xxxx.dns.com",
+    "pending": "DNS not connected yet",
+    "connected": "Connected",
+    "notify": "Domain connected",
+    "notifySub": "app.yourbrand.com is live",
+    "caption": "Whitelabel: your brand, your domain, one DNS record",
+    "badge": "Whitelabel"
+  },
+  "Help": {
+    "headline": "Need help?",
+    "sub": "Reach out to us anytime",
+    "email": "contact@magicbolt.ai",
+    "site": "www.magicbolt.ai",
+    "caption": "Need help? Reach out anytime",
+    "badge": "Help"
+  },
+  "Browser": {
+    "title": "Agency OS Panel",
+    "business": "Sunrise Dental Care",
+    "agencyTab": "Agency",
+    "clientTab": "Client"
+  },
+  "Nav": [
+    "Agency Dashboard",
+    "Clients / Signup",
+    "All Businesses",
+    "Connections List",
+    "AI Content",
+    "Subscriptions",
+    "Billing",
+    "Lead Center",
+    "Bulk Messaging",
+    "Integrations"
   ],
-  "perMonth": "/ month",
-  "assignTitle": "Assign plan",
-  "customerLabel": "Customer",
-  "customer": "Green Leaf Café",
-  "planLabel": "Plan",
-  "plan": "Growth",
-  "assign": "Assign",
-  "done": "Growth plan assigned",
-  "doneSub": "Green Leaf Café",
-  "caption": "Higher limits = higher price",
-  "badge": "Plans"
- },
- "Billing": {
-  "eyebrow": "Billing",
-  "headline": "Track your revenue",
-  "points": [
-   "MRR & ARPU",
-   "Active subscriptions",
-   "Paid · Partial · Overdue"
-  ],
-  "title": "Billing",
-  "sub": "Revenue and invoices across every client",
-  "metrics": [
-   {
-    "label": "MRR",
-    "prefix": "₹"
-   },
-   {
-    "label": "ARPU",
-    "prefix": "₹"
-   },
-   {
-    "label": "Active subscriptions",
-    "prefix": ""
-   },
-   {
-    "label": "Overdue",
-    "prefix": "₹"
-   }
-  ],
-  "invoicesTitle": "Invoices",
-  "columns": [
-   "Invoice",
-   "Client",
-   "Amount",
-   "Status"
-  ],
-  "invoices": [
-   {
-    "id": "INV-1042",
-    "client": "Sunrise Dental Care",
-    "amount": "₹1,999",
-    "status": "Paid"
-   },
-   {
-    "id": "INV-1043",
-    "client": "Green Leaf Café",
-    "amount": "₹2,499",
-    "status": "Partial"
-   },
-   {
-    "id": "INV-1044",
-    "client": "Urban Fit Gym",
-    "amount": "₹999",
-    "status": "Overdue"
-   },
-   {
-    "id": "INV-1045",
-    "client": "Bloom Salon & Spa",
-    "amount": "₹1,499",
-    "status": "Paid"
-   }
-  ],
-  "toast": "Invoices: Paid, Partial, Overdue",
-  "caption": "Billing: MRR, ARPU, active subscriptions, invoices",
-  "badge": "Billing"
- },
- "Leads": {
-  "eyebrow": "Lead Center",
-  "headline": "Find new clients",
-  "sub": "Businesses from Google by category & location",
-  "points": [
-   "Pick a category",
-   "Choose a location",
-   "Call them directly"
-  ],
-  "categoryLabel": "Category",
-  "category": "Dentist",
-  "locationLabel": "Location",
-  "location": "Pune, Maharashtra",
-  "search": "Search",
-  "results": [
-   "Smile Studio Dental",
-   "Bright Teeth Clinic",
-   "Pearl Dental Care",
-   "Happy Smiles Centre"
-  ],
-  "areas": [
-   "Kothrud",
-   "Baner",
-   "Viman Nagar",
-   "Aundh"
-  ],
-  "call": "Call",
-  "notify": "24 businesses found",
-  "notifySub": "Dentist · Pune",
-  "caption": "Lead Center: businesses from Google by category & location",
-  "badge": "Leads"
- },
- "Bulk": {
-  "eyebrow": "Bulk messaging",
-  "headline": "Broadcast to customers",
-  "sub": "One message, every customer",
-  "points": [
-   "Pick your audience",
-   "Write once",
-   "Send to all"
-  ],
-  "title": "New broadcast",
-  "toLabel": "To",
-  "audience": [
-   "All customers",
-   "128 contacts"
-  ],
-  "messageLabel": "Message",
-  "message": "Hi! Our Diwali offer is live: 20% off this week. Reply YES to book.",
-  "send": "Send broadcast",
-  "sent": "Sent to 128 customers",
-  "sentSub": "Bulk messaging",
-  "caption": "Bulk messaging: broadcast to your customers",
-  "badge": "Broadcast"
- },
- "Integrations": {
-  "eyebrow": "Integrations",
-  "headline": "Integrations",
-  "sub": "Each one has its own video",
-  "points": [
-   "Covered in their own videos"
-  ],
-  "items": [
-   "Google Business Profile",
-   "Meta",
-   "WhatsApp",
-   "WordPress",
-   "Pinterest",
-   "Reddit"
-  ],
-  "watch": "Watch video",
-  "caption": "Integrations: covered in their own videos",
-  "badge": "Integrations"
- },
- "Help": {
-  "headline": "Need help?",
-  "sub": "Reach out to us anytime",
-  "email": "contact@magicbolt.ai",
-  "site": "www.magicbolt.ai",
-  "caption": "Need help? Reach out anytime",
-  "badge": "Help"
- },
- "Browser": {
-  "title": "Agency OS Panel",
-  "business": "Sunrise Dental Care",
-  "agencyTab": "Agency",
-  "clientTab": "Client"
- },
- "Nav": [
-  "Agency Dashboard",
-  "Clients / Signup",
-  "All Businesses",
-  "Connections List",
-  "AI Content",
-  "Subscriptions",
-  "Billing",
-  "Lead Center",
-  "Bulk Messaging",
-  "Integrations"
- ],
- "_help": {
-  "Title.title": "max ~45 chars",
-  "SignUp.caption": "keep 'then', never 'than'",
-  "Tiers.headline": "max ~28 chars",
-  "Dashboard.caption": "max ~55 chars"
- }
+  "_help": {
+    "Title.title": "max ~45 chars",
+    "SignUp.caption": "keep 'then', never 'than'",
+    "Tiers.headline": "max ~28 chars",
+    "Dashboard.caption": "max ~55 chars"
+  }
 }

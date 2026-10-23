@@ -36,3 +36,15 @@
 .top-link:hover { background: #f1f5ff; color: var(--deep); }
 .top-link.on { background: #edf3ff; border-color: #dce7ff; color: #1d4bb5; }
 @media (max-width: 760px) { .top-nav { order: 2; margin-left: auto; } }
+
+/* top right icons: dark mode and full screen */
+.top-right { gap: 6px; }
+.icon-btn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--slate); display: grid; place-items: center; cursor: pointer; padding: 0; transition: .15s; }
+.icon-btn:hover { background: #f1f5ff; color: var(--deep); border-color: #dce7ff; }
+.icon-btn svg { display: block; }
+.icon-btn .ic-sun, .icon-btn .ic-compress { display: none; }
+html[data-theme="dark"] .icon-btn .ic-moon { display: none; }
+html[data-theme="dark"] .icon-btn .ic-sun { display: block; }
+.icon-btn.is-fs .ic-expand { display: none; }
+.icon-btn.is-fs .ic-compress { display: block; }
+html[data-theme="dark"] .icon-btn:hover { background: #262626; color: #e0e0e0; border-color: #3a3a3a; }

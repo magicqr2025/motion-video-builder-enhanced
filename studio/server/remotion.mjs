@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import {spawn, execFile} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {REEL, REEL_ENTRY, REEL_SRC_STUDIO, REMOTION_CLI, FFMPEG, FFPROBE, reelRequire} from './paths.mjs';
@@ -56,17 +57,49 @@ export const StudioCompositions: React.FC = () => (
 let queue = Promise.resolve();
 const serial = (fn) => { const p = queue.then(fn, fn); queue = p.catch(() => {}); return p; };
 
+// Every bundle() unpacks a ~570 MB copy of the project into the temp folder and Remotion never removes it: 40 runs filled 15 GB.
+// So a bundle is deleted as soon as the run that used it is done (reference-counted: a long render keeps its own), and stale ones
+// left by runs that were killed are swept when a new bundle is made and when the studio starts.
+const bundleUses = new Map();
+const removing = new Set(); // deletions in flight, so a command-line script can wait for them before it exits
+const BUNDLE_PREFIX = 'remotion-webpack-bundle-';
+export const releaseBundle = (url) => {
+  const n = (bundleUses.get(url) ?? 1) - 1;
+  if (n > 0) { bundleUses.set(url, n); return; }
+  bundleUses.delete(url);
+  if (!path.basename(String(url)).startsWith(BUNDLE_PREFIX)) return;
+  const p = fs.promises.rm(url, {recursive: true, force: true}).catch(() => {}).finally(() => removing.delete(p));
+  removing.add(p);
+};
+export const awaitBundleCleanup = () => Promise.all([...removing]);
+export const sweepBundles = (maxAgeMs = 30 * 60 * 1000) => {
+  let removed = 0;
+  try {
+    for (const d of fs.readdirSync(os.tmpdir(), {withFileTypes: true})) {
+      if (!d.isDirectory() || !d.name.startsWith(BUNDLE_PREFIX)) continue;
+      const full = path.join(os.tmpdir(), d.name);
+      if (bundleUses.has(full)) continue;
+      try { if (Date.now() - fs.statSync(full).mtimeMs > maxAgeMs) { fs.rmSync(full, {recursive: true, force: true}); removed++; } } catch {}
+    }
+  } catch {}
+  return removed;
+};
+
 export const bundleSite = (onProgress) => serial(async () => {
   writeRegistry();
   const {bundle} = await load('@remotion/bundler');
-  return bundle({entryPoint: REEL_ENTRY, rootDir: REEL, publicDir: path.join(REEL, 'public'), onProgress: (p) => onProgress?.(p / 100), enableCaching: true});
+  const url = await bundle({entryPoint: REEL_ENTRY, rootDir: REEL, publicDir: path.join(REEL, 'public'), onProgress: (p) => onProgress?.(p / 100), enableCaching: true});
+  bundleUses.set(url, (bundleUses.get(url) ?? 0) + 1);
+  sweepBundles();
+  return url;
 });
 
 // ---------- stills: [{composition, frame, props, out}] rendered with one bundle and one browser ----------
 export const renderStills = async (specs, {onProgress, serveUrl} = {}) => {
   const {openBrowser, selectComposition, renderStill} = await load('@remotion/renderer');
+  const ownBundle = !serveUrl;
   serveUrl ??= await bundleSite((p) => onProgress?.({stage: 'bundling', progress: p}));
-  const browser = await openBrowser('chrome', {chromiumOptions: CHROMIUM});
+  const browser = await openBrowser('chrome', {chromiumOptions: CHROMIUM}).catch((e) => { if (ownBundle) releaseBundle(serveUrl); throw e; });
   const done = [];
   try {
     for (const [i, s] of specs.entries()) {
@@ -84,6 +117,7 @@ export const renderStills = async (specs, {onProgress, serveUrl} = {}) => {
     }
   } finally {
     await browser.close({silent: true}).catch(() => {});
+    if (ownBundle) releaseBundle(serveUrl);
   }
   onProgress?.({stage: 'stills', progress: 1});
   return done;
@@ -93,6 +127,7 @@ export const renderStills = async (specs, {onProgress, serveUrl} = {}) => {
 export const renderVideo = async ({composition: id, out, props = {}, scale = 1, onProgress, signal}) => {
   const {selectComposition, renderMedia, makeCancelSignal} = await load('@remotion/renderer');
   const serveUrl = await bundleSite((p) => onProgress?.({stage: 'bundling', progress: p}));
+  try {
   const composition = await selectComposition({serveUrl, id, inputProps: props, chromiumOptions: CHROMIUM});
   const cancel = makeCancelSignal();
   signal?.addEventListener('abort', () => cancel.cancel());
@@ -103,10 +138,13 @@ export const renderVideo = async ({composition: id, out, props = {}, scale = 1, 
     onProgress: ({progress, renderedFrames, stitchStage}) => onProgress?.({stage: stitchStage === 'muxing' ? 'muxing' : 'rendering', progress, frames: renderedFrames, total: composition.durationInFrames}),
   });
   return {out, durationInFrames: composition.durationInFrames, fps: composition.fps, width: composition.width, height: composition.height};
+  } finally { releaseBundle(serveUrl); }
 };
 
 // ---------- live Remotion Studio (hot-reloads while the agent edits code) ----------
 let studioProc = null;
+let studioStopping = false;
+let studioRestarts = [];
 export const STUDIO_PORT = Number(process.env.REMOTION_STUDIO_PORT ?? 3100);
 export const startRemotionStudio = (log = () => {}) => {
   if (studioProc) return;
@@ -114,9 +152,19 @@ export const startRemotionStudio = (log = () => {}) => {
   studioProc = spawn(process.execPath, [REMOTION_CLI, 'studio', '--port', String(STUDIO_PORT), '--no-open'], {cwd: REEL, env: {...process.env, BROWSER: 'none'}});
   studioProc.stdout.on('data', (d) => log(String(d)));
   studioProc.stderr.on('data', (d) => log(String(d)));
-  studioProc.on('exit', () => { studioProc = null; });
+  // the live preview must not stay dead (a blank "localhost refused to connect" box): start it again, unless we stopped it or it keeps failing
+  studioProc.on('exit', (code) => {
+    studioProc = null;
+    if (studioStopping) return;
+    const now = Date.now();
+    studioRestarts = studioRestarts.filter((t) => now - t < 5 * 60 * 1000);
+    if (studioRestarts.length >= 5) { log('[preview-gave-up] The Remotion preview server keeps stopping, so it was not restarted again. Restart Video Studio to try once more.'); return; }
+    studioRestarts.push(now);
+    log(`[preview-restart] The Remotion preview server stopped (exit ${code ?? 'unknown'}), restarting it…`);
+    setTimeout(() => startRemotionStudio(log), 3000);
+  });
 };
-export const stopRemotionStudio = () => studioProc?.kill();
+export const stopRemotionStudio = () => { studioStopping = true; studioProc?.kill(); };
 
 // ---------- ffmpeg helpers ----------
 const run = (bin, args) => new Promise((res, rej) => execFile(bin, args, {maxBuffer: 1 << 26, windowsHide: true}, (e, out, err) => (e ? rej(new Error(String(err || e.message).slice(-600))) : res(String(out)))));

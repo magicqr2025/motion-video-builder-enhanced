@@ -101,6 +101,12 @@ export const onServerEvent = (e) => {
   if (e.type === 'tick') {
     A.tick = e;
     for (const p of e.procs ?? []) if (!A.procs.has(p.id) || A.procs.get(p.id).status === 'running') A.procs.set(p.id, p);
+    // The server says what is running right now. Anything this page still shows as running but the server no longer lists
+    // lost its "finished" message (reconnect, studio restart): close it instead of showing it as running forever.
+    if (Array.isArray(e.procs)) {
+      const live = new Set(e.procs.map((p) => p.id)), now = Date.now();
+      for (const [id, p] of A.procs) if (p.status === 'running' && !live.has(id)) { A.procs.set(id, {...p, status: 'stopped', endedAt: now, durationMs: now - p.startedAt, error: p.error ?? 'No longer running on the studio server.'}); delete A.steps[id]; }
+    }
     schedule();
     return true;
   }
@@ -258,7 +264,7 @@ const buildLog = () => {
   $('#dock-pane').innerHTML = `<div class="lg">
     <div class="tbar"><label class="inl">Show <select id="lg-src"></select></label><div class="chips" id="lg-kinds"></div>
       <input id="lg-q" type="search" placeholder="Search the log…" value="${esc(A.q)}" aria-label="Search the log" />
-      <span class="sp"></span><button type="button" class="abtn" id="lg-copy" title="Copy the lines shown">Copy</button><button type="button" class="abtn" id="lg-clear" title="Hides the lines shown. Nothing is deleted: they stay saved on disk.">Clear view</button></div>
+      <span class="sp"></span><button type="button" class="abtn" id="lg-copy" title="Copy the lines shown">Copy</button><button type="button" class="abtn" id="lg-dl" title="Download the log as a file">⬇ Download</button><button type="button" class="abtn" id="lg-clear" title="Hides the lines shown. Nothing is deleted: they stay saved on disk.">Clear view</button></div>
     <details class="guide"><summary>What do the tags mean?</summary><div class="guide-b">
       <div><i class="chip s-ai">Edit</i><i class="chip s-ai">Bash</i><i class="chip s-ai">reply</i> what the AI did: a tool it used, or a message it wrote</div>
       <div><i class="chip s-render">Render</i><i class="chip s-media">Media</i><i class="chip s-save">Action</i><i class="chip s-page">Page</i> which part of the studio wrote the line</div>
@@ -372,6 +378,14 @@ export const initActivity = (getCtx) => {
     else if (e.target.closest('#lg-copy')) {
       const text = logRows().map((x) => `${clock(x.ts)} [${x.tool || SRC[x.source] || x.source}${x.where ? ` @${x.where}` : ''}] ${x.level === 'error' ? 'ERROR ' : ''}${x.text}${x.n > 1 ? ` (x${x.n})` : ''}`).join('\n');
       try { await navigator.clipboard.writeText(text); note('Copied the log to the clipboard.', {source: 'system'}); } catch { note('Could not copy the log (clipboard blocked).', {level: 'warn', source: 'system'}); }
+    } else if (e.target.closest('#lg-dl')) {
+      const a = document.createElement('a');
+      if (A.logSource !== 'live') { a.href = `/data/activity/log-${A.logSource}.jsonl`; a.download = `video-studio-log-${A.logSource}.jsonl`; }
+      else {
+        const text = logRows().map((x) => `${new Date(x.ts).toISOString()} [${x.tool || SRC[x.source] || x.source}${x.where ? ` @${x.where}` : ''}] ${x.level === 'error' ? 'ERROR ' : ''}${x.text}${x.n > 1 ? ` (x${x.n})` : ''}`).join('\n') + '\n';
+        a.href = URL.createObjectURL(new Blob([text], {type: 'text/plain'})); a.download = `video-studio-log-${dayKey(Date.now())}.txt`;
+      }
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     } else if (e.target.closest('#lg-clear')) {
       const ids = new Set(logRows().map((x) => x.id));
       if (A.logSource === 'live') A.entries = A.entries.filter((x) => !ids.has(x.id)); else A.hist = {...A.hist, entries: []};

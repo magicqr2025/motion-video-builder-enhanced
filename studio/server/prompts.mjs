@@ -258,3 +258,12 @@ Rules:
 4. Typecheck, then render ONE check still for every changed or new scene (the middle of the scene) into ${projectDir(p.id)}/checks/, named like 03-inbox-13.6s.png (replace that scene's older still: same name, or delete the old file). Render them at normal size, because the user will look at them. Look at each one yourself once.
 Reply with one short line per scene saying what you changed (or why you could not) and the new total duration. The user will review the new frames and approve before anything is rendered.`;
 };
+
+// Continue a build that was cut short (studio closed, PC out of memory). The saved Claude session still has the earlier turns.
+export const resumeBuildPrompt = (p, conceptId, notes) => `## RESUME: the earlier build of this video was interrupted
+The studio stopped while you were building. Do NOT start over and do not throw away finished work.
+1. First look at what already exists: ${rel(projectCode(p.id))}/ (config.ts, the video component, text.json, audio.json, look.json), the check stills in ${projectDir(p.id)}/checks/ and the chat so far.
+2. Keep everything that is finished and correct. Finish only what is missing or was left half-done.
+3. Then complete the remaining steps of the task below (storyboard.json with the real timing, typecheck, check stills that you look at, SCRIPT.md if needed). A video is only done once storyboard.json exists.
+
+${buildPrompt(p, conceptId, notes)}`;

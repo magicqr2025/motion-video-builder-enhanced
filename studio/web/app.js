@@ -1,6 +1,8 @@
 // MagicBolt Video Studio: browser side. Plain JS modules, no build step.
 import {initTools, renderTools, toolsChanged} from './tools.js';
+import {initStorage, renderStorage} from './storage.js';
 import {initReview, reviewHtml, reviewEditing} from './review.js';
+import {initFiles} from './files.js';
 import {initStory, storyHTML, renderStory, storyRunning, stopStoryRun, aiFilled, usageHTML} from './story.js';
 import {initActivity, onServerEvent, note, setConnection, refreshContext} from './activity.js';
 const $ = (s, el = document) => el.querySelector(s);
@@ -47,10 +49,21 @@ const foldKey = (k) => `studio-fold-${k}`;
 const setFold = (sec, folded) => { sec.classList.toggle('folded', folded); sec.querySelector('.sec-head')?.setAttribute('aria-expanded', String(!folded)); };
 document.querySelectorAll('.side-sec').forEach((sec) => { try { setFold(sec, localStorage.getItem(foldKey(sec.dataset.sec)) === '1'); } catch { /* storage unavailable */ } });
 
+// ---------- theme and full screen (top right) ----------
+const applyTheme = (t) => {
+  document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+  try { localStorage.setItem('studio-theme', t === 'dark' ? 'dark' : 'light'); } catch { /* storage unavailable */ }
+  const b = $('#theme-btn');
+  if (b) { b.title = t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'; b.setAttribute('aria-pressed', String(t === 'dark')); }
+};
+applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+document.addEventListener('fullscreenchange', () => { const b = $('#fs-btn'); if (b) { b.classList.toggle('is-fs', !!document.fullscreenElement); b.title = document.fullscreenElement ? 'Exit full screen' : 'Full screen'; } });
+
 // ---------- routing ----------
 const route = () => {
   const [, kind, id, tab] = location.hash.split('/');
   if (kind === 'tools') return {id: null, tools: true};
+  if (kind === 'storage') return {id: null, storage: true};
   return kind === 'p' && id ? {id, tab: tab || null} : {id: null};
 };
 const go = (id, tab) => { location.hash = id ? `#/p/${id}/${tab ?? ''}` : '#/'; };
@@ -75,6 +88,7 @@ const load = async () => {
   const r = route();
   await loadState().catch((e) => toast(e.message));
   if (r.tools) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Video tools</b> · video to script &amp; MP3'; note('Opened Video tools.', {projectId: null}); await renderTools(); refreshContext(); return; }
+  if (r.storage) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Storage</b> · files and clean-up'; note('Opened Storage.', {projectId: null}); await renderStorage(); refreshContext(); return; }
   if (!r.id) { S.cur = null; note('Opened the home page.', {projectId: null}); renderHome(); renderChat(); refreshContext(); return; }
   try { await loadProject(r.id); } catch { note(`Could not open video “${r.id}” (it no longer exists). Going home.`, {level: 'warn', projectId: null}); go(null); return; }
   S.tab = r.tab || bestTab(S.cur.project);
@@ -88,6 +102,7 @@ const load = async () => {
 const renderSide = () => {
   const r = route();
   $('#tools-link')?.classList.toggle('on', !!r.tools);
+  $('#storage-link')?.classList.toggle('on', !!r.storage);
   const all = S.state.projects, STEP = 8;
   S.sideLimit ??= STEP;
   // the open video always stays in the list, even when it is beyond the current page
@@ -200,7 +215,7 @@ const headMeta = (p, sb) => {
   const stamp = fmtStamp(p.updatedAt);
   return `${total ? `<span class="pill blue" title="Total video length">⏱ ${fmtT(total)}</span>` : ''}${stamp ? `<span class="muted small" title="Last updated ${esc(new Date(p.updatedAt).toLocaleString())}">Updated ${esc(stamp)}</span>` : ''}`;
 };
-const tabEnabled = (t, p, cur) => !(S.plannerBusy && t === 'brief') && (t === 'script' || t === 'brief' || t === 'look' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard));
+const tabEnabled = (t, p, cur) => !(S.plannerBusy && t === 'brief') && (t === 'script' || t === 'brief' || t === 'look' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || cur.resumable || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard));
 const tabDone = (t, p) => ({brief: p.status !== 'brief', look: !!p.look?.reviewed, concepts: !!p.approvedConcept, build: !!p.approval, text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
 
 const renderProject = () => {
@@ -499,6 +514,7 @@ const renderConcepts = () => {
   const portrait = p.brief.height > p.brief.width;
   const approved = p.approvedConcept?.id;
   $('#tab').innerHTML = `
+    ${S.cur.resumable && !busy ? resumeCard(p, busy) : ''}
     ${busy ? `<div class="card row" style="margin-bottom:16px"><div class="spinner" style="width:22px;height:22px;border-width:3px;margin:0"></div><b>Claude is working…</b><span class="live-line" data-live-last></span><span class="muted">samples refresh when done</span></div>` : ''}
     ${doc.analysis?.length ? `<div class="card" style="margin-bottom:18px"><h3>What Claude understood</h3><ul class="analysis">${[].concat(doc.analysis).map((a) => `<li>${esc(a)}</li>`).join('')}</ul></div>` : ''}
     <div class="concepts">${doc.concepts.map((c) => `
@@ -528,13 +544,39 @@ const renderConcepts = () => {
 };
 
 // ---------- 3 · build & timing ----------
+const resumeCard = (p, busy) => `<div class="card resume-card"><div class="resume-ic">!</div><div class="resume-tx"><h2>The build was interrupted</h2>
+  <p>The studio stopped while Claude was building “${esc(p.approvedConcept?.name ?? 'your video')}”. Your work is saved (the video code and the check frames). <b>Resume</b> carries on from where it stopped. It does not start over.</p>
+  <div class="row"><button type="button" class="btn primary lg" data-action="resume-build" ${busy ? 'disabled' : ''}>▶ Resume build</button><span class="small muted">Uses AI. Usually much quicker than a fresh build.</span></div></div></div>`;
+// ---------- build checklist ----------
+const tasksHtml = (bp) => {
+  const tasks = bp.tasks, doneN = tasks.filter((t) => t.done).length, open = tasks.findIndex((t) => !t.done);
+  const todos = bp.todos ?? [], todoDone = todos.filter((t) => t.status === 'completed').length;
+  return `<div class="card tasks-card">
+    <div class="spread"><div><h3>Build checklist</h3><div class="small muted">${doneN} of ${tasks.length} done${bp.busy ? ' · Claude is working on it' : bp.interrupted ? ' · interrupted, press Resume below' : doneN === tasks.length ? ' · all done' : ''}</div></div>
+      <span class="pill ${doneN === tasks.length ? 'green' : 'blue'}">${Math.round(doneN / tasks.length * 100)}%</span></div>
+    <div class="bar"><i style="width:${Math.max(3, doneN / tasks.length * 100)}%"></i></div>
+    <ol class="tasks">${tasks.map((t, i) => `<li class="${t.done ? 'done' : i === open ? (bp.busy ? 'active' : 'next') : ''}"><span class="tk">${t.done ? '✓' : i === open && bp.busy ? '<i class="dot"></i>' : ''}</span><div><b>${esc(t.label)}</b>${t.detail ? `<small>${esc(t.detail)}</small>` : i === open && !bp.busy && !bp.interrupted ? '<small>next</small>' : ''}</div></li>`).join('')}</ol>
+    ${bp.busy && bp.now ? `<div class="tasks-now"><i class="dot"></i><span>${esc(bp.now)}</span></div>` : ''}
+    ${todos.length ? `<details class="tasks-ai" ${bp.busy ? 'open' : ''}><summary>Claude's own to-do list · ${todoDone} of ${todos.length} done</summary><ul>${todos.map((t) => `<li class="${esc(t.status)}"><span>${t.status === 'completed' ? '✓' : t.status === 'in_progress' ? '▶' : '○'}</span>${esc(t.status === 'in_progress' ? t.activeForm || t.content : t.content)}</li>`).join('')}</ul></details>` : ''}
+  </div>`;
+};
+let bpTimer = null;
+const loadBuildProgress = async () => {
+  if (!$('#build-tasks') || !S.cur) return;
+  try { const bp = await api(`/api/projects/${S.cur.project.id}/build-progress`); const host = $('#build-tasks'); if (host) host.innerHTML = tasksHtml(bp); } catch { /* the next update retries */ }
+};
+const pokeBuildProgress = () => { if (S.tab !== 'build') return; clearTimeout(bpTimer); bpTimer = setTimeout(loadBuildProgress, 1500); };
+
 const renderBuild = () => {
   const {project: p, storyboard: sb, checks, busy} = S.cur;
+  if (!sb && S.cur.resumable && !busy) { $('#tab').innerHTML = `<div id="build-tasks"></div>${resumeCard(p, busy)}`; loadBuildProgress(); return; }
   if (!sb) {
-    $('#tab').innerHTML = `<div class="card waiting"><div class="spinner"></div><h2>Building “${esc(p.approvedConcept?.name ?? 'your video')}”</h2><p>Claude is writing the scenes, syncing them to the voiceover and checking frames. The timing appears here when it's ready.</p>${liveBox()}${busy ? '<button type="button" class="btn danger" data-action="stop" style="margin-top:16px">Stop</button>' : ''}</div>`;
+    $('#tab').innerHTML = `<div id="build-tasks"></div><div class="card waiting"><div class="spinner"></div><h2>Building “${esc(p.approvedConcept?.name ?? 'your video')}”</h2><p>Claude is writing the scenes, syncing them to the voiceover and checking frames. The timing appears here when it's ready.</p>${liveBox()}${busy ? '<button type="button" class="btn danger" data-action="stop" style="margin-top:16px">Stop</button>' : ''}</div>`;
+    loadBuildProgress();
     return;
   }
-  $('#tab').innerHTML = reviewHtml();
+  $('#tab').innerHTML = `<div id="build-tasks"></div>${reviewHtml()}`;
+  loadBuildProgress();
 };
 
 // ---------- text: edit src/studio/<id>/text.json directly ----------
@@ -975,6 +1017,14 @@ es.onopen = () => setConnection(true);
 es.onerror = () => setConnection(false);
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
+  // The heartbeat lists what is really running. If this page still shows the open video as busy (or a render as running) but the
+  // server says it is not, the "finished" message was lost (reconnect, restart): correct the page instead of showing it as running.
+  if (e.type === 'tick' && S.cur) {
+    const serverBusy = (e.busy ?? []).some((b) => b.projectId === S.cur.project.id);
+    if (S.cur.busy && !serverBusy) { S.cur.busy = false; renderChat(); refresh(); }
+    if (S.renderJob && !S.renderJob.done && !e.render) { S.renderJob = {...S.renderJob, done: true, stage: 'error', error: 'Stopped'}; renderRenderPill(); }
+    syncHeadStop();
+  }
   if (onServerEvent(e)) return; // activity lines + heartbeat feed the Activity dock only
   if (e.type === 'tools') { if (route().tools) toolsChanged(); return; }
   if (e.type === 'projects') return refresh(false);
@@ -989,11 +1039,14 @@ es.onmessage = (m) => {
     if (S.plannerBusy && e.kind === 'tool') { S.plannerProgress = {message: e.text}; updatePlannerWait(); }
     if (e.kind === 'done') { refresh(); if (e.ok) toast(`${aiName()} finished.`); return; }
     S.cur.log.push(e);
+    if (e.kind === 'tool') pokeBuildProgress();
     renderChat();
   }
 };
 
 initTools({api, toast});
+initStorage({api, toast});
+initFiles({api, toast, reload: async () => { await loadProject(S.cur.project.id); renderProject(); renderChat(); }});
 initReview({S: () => S, api, toast, esc, fmtT, bust, liveBox, rerender: () => renderBuild(), reload: async () => { await loadProject(S.cur.project.id); renderProject(); renderChat(); }});
 
 // ---------- activity dock: what the page itself is doing ----------
@@ -1075,6 +1128,12 @@ document.addEventListener('click', async (ev) => {
         applyPanelState();
         break;
       case 'home': go(null); break;
+      case 'toggle-theme': applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
+      case 'toggle-fullscreen': if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); break;
+      case 'resume-build':
+        await api(`/api/projects/${id}/resume-build`, {method: 'POST'});
+        toast('Resuming the build…'); S.tab = 'build'; go(id, 'build'); await refresh?.(false);
+        break;
       case 'lg-fold': { const sec = a.closest('.look-group'), off = !sec.classList.contains('folded'); sec.classList.toggle('folded', off); a.setAttribute('aria-expanded', String(!off)); try { localStorage.setItem(`studio-lg-${sec.dataset.lg}`, off ? '1' : '0'); } catch { /* ignore */ } break; }
       case 'look-reset': await saveLook({bundle: 'none', levels: null}); S.lookAI = null; renderLook(); toast('Everything is off. Pick a style or switch on what you like.'); break;
       case 'look-suggest': {

@@ -13,7 +13,8 @@ export const SIDEBAR_W = 270;
 
 // ---------- full video: synced to the voiceover (agency-panell-trainin1.mp3, 69.15 s) ----------
 // Every scene starts on its sentence start; cues are absolute voiceover seconds (the scene subtracts its start).
-export const VIDEO = {fps: 24, width: 1920, height: 1080, xfade: 0.35, endGap: 0.6, endSec: 10.04, voEnd: 69.0};
+// voEnd = 69.0 in the current recording + 5 s for the inserted whitelabel scene (needs a new voiceover + Re-sync).
+export const VIDEO = {fps: 24, width: 1920, height: 1080, xfade: 0.35, endGap: 0.6, endSec: 10.04, voEnd: 74.0};
 export const SCENES = {
   title:        {start: 0},                                                                   // VO 0.06  "Want to run your entire agency…" + "quick walkthrough"
   signup:       {start: 6.78, site: 7.89, signup: 9.41, login: 10.11, email: 10.85, password: 11.42, submit: 11.9}, // VO 6.78
@@ -28,9 +29,10 @@ export const SCENES = {
   leads:        {start: 56.63, google: 58.56, category: 59.16, location: 59.81, call: 61.02}, // VO 56.63
   bulk:         {start: 61.67, broadcast: 62.87, customers: 63.66},                           // VO 61.67
   integrations: {start: 64.49, videos: 66.05},                                                // VO 64.49
-  help:         {start: 66.84, reach: 67.6},                                                  // VO 66.84
+  whitelabel:   {start: 66.84, brand: 67.3, domain: 68.1, save: 68.95, dns: 69.25, copy: 69.95, connected: 70.85}, // NEW, 5 s, no VO yet (proposed line in storyboard)
+  help:         {start: 71.84, reach: 72.6},                                                  // VO 66.84 in the current recording (+5 s)
 };
-export const ORDER = ['title', 'signup', 'dashboards', 'dashboard', 'clients', 'connections', 'ai', 'plans', 'tiers', 'billing', 'leads', 'bulk', 'integrations', 'help'] as const;
+export const ORDER = ['title', 'signup', 'dashboards', 'dashboard', 'clients', 'connections', 'ai', 'plans', 'tiers', 'billing', 'leads', 'bulk', 'integrations', 'whitelabel', 'help'] as const;
 export type SceneKey = typeof ORDER[number];
 export const END_START = VIDEO.voEnd + VIDEO.endGap;              // EndLogo after the last sentence + 0.6 s
 export const DURATION = END_START + VIDEO.endSec;

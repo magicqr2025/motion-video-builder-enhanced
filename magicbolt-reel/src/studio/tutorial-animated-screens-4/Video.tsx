@@ -8,6 +8,7 @@ import {CameraRig, CountUp, CursorPath, Notification, ProgressBar, SceneSeq, Spo
 import {Abs, Badge, Btn, DATA, Feature, Field, In, L, Panel, Placed, SB, STATUS_C, Shell, Stage, ek, typed} from './Concepts';
 import {BROWSER_B, DURATION, END_START, ORDER, SCENES, SceneKey, VIDEO, sceneEnd, NAVY, DEEP, BLUE, GOLD, ORANGE, SLATE, GREEN, RED, LINE, MUTED} from './config';
 import TEXT from './text.json';
+import {FM} from '../../dns2/mock';
 
 type Rect = {x: number; y: number; w: number; h: number};
 const rel = (start: number) => (abs: number) => abs - start;
@@ -293,7 +294,7 @@ const Leads: React.FC = () => {
         </Panel></div></Abs>;
       })}
     </Screen>
-    <Spotlight level={L} keys={[Pt(SB(300, 86, 920, 90), r(S.category)), Pt(SB(1300, 180, 200, 470), r(S.call) - 0.3)]} />
+    <Spotlight level={L} keys={[Pt(SB(300, 86, 920, 90), r(S.category)), Pt(SB(1300, 180, 200, 130), r(S.call) - 0.3)]} />
     <Note at={res + 0.3} title={T.notify} sub={T.notifySub} icon="target" c={BLUE} />
     <CursorPath keys={[{t: 0, x: 1100, y: 900}, {t: r(S.call) - 0.4, x: call.x, y: call.y}, {t: r(S.call), x: call.x, y: call.y, click: true}]} />
   </>;
@@ -334,7 +335,49 @@ const Integrations: React.FC = () => {
   </>;
 };
 
-// ---------- 13. help ----------
+// ---------- 13. whitelabel + DNS (idea and record card from the dns2 whitelabel tutorial) ----------
+const Whitelabel: React.FC = () => {
+  const S = SCENES.whitelabel, r = rel(S.start), T = TEXT.Whitelabel, t = useSec();
+  const reveal = ek(t, r(S.dns), 0.4), copied = ek(t, r(S.copy), 0.2), done = t > r(S.connected);
+  const save = SB(300 + 28 + 60, 170 + 440 + 26), copy = SB(890 + 616 - 50, 170 + 130 + 140 + 30);
+  const pill = done ? [T.connected, '#E2F7EC', '#0E9A5C', GREEN] : [T.pending, '#FFF1DE', '#C46A00', ORANGE];
+  const rows: [string, string, boolean][] = [[T.typeLabel, T.type, false], [T.hostLabel, T.host, true], [T.targetLabel, T.target, true]];
+  return <>
+    <Screen f={T} icon="globe" icons={['name', 'globe', 'dns']} cues={[r(S.brand), r(S.domain), r(S.dns)]} active={-1}>
+      <In at={0.15} x={300} y={88}><Tx size={34} color={NAVY}>{T.title}</Tx></In>
+      <In at={0.3} x={300} y={170}><Panel w={560} h={520} style={{padding: 28}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 14}}><IconChip name="name" size={48} c={BLUE} round /><Tx size={24} color={NAVY}>{T.brandTitle}</Tx></div>
+        <div style={{marginTop: 22}}><Field label={T.nameLabel} value={T.name} w={504} at={r(S.brand)} active={t > r(S.brand) && t < r(S.domain)} /></div>
+        <div style={{marginTop: 16}}><Field label={T.domainLabel} value={T.domain} w={504} at={r(S.domain)} active={t > r(S.domain) && t < r(S.save)} /></div>
+        <div style={{marginTop: 18}}><Tx size={18} color={SLATE}>{T.colorsLabel}</Tx>
+          <div style={{display: 'flex', gap: 12, marginTop: 10}}>{[NAVY, DEEP, BLUE, GOLD, ORANGE].map((c, i) => { const k = ek(t, 0.6 + i * 0.08, 0.35); return <div key={c} style={{width: 40, height: 40, borderRadius: 20, background: c, transform: `scale(${k})`, boxShadow: '0 4px 10px rgba(14,27,77,.2), inset 0 2px 4px rgba(255,255,255,.45)'}} />; })}</div>
+        </div>
+        <div style={{position: 'absolute', left: 28, bottom: 28}}><Btn label={T.save} gold size={22} hover={ek(t, r(S.save), 0.2)} /></div>
+      </Panel></In>
+      <In at={0.45} x={890} y={170}><Panel w={616} h={520} style={{padding: 28}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 14}}><IconChip name="dns" size={48} c={DEEP} round />
+          <div style={{flex: 1}}><Tx size={24} color={NAVY}>{T.dnsTitle}</Tx><div><Tx size={16} color={SLATE} w={400}>{T.dnsSub}</Tx></div></div>
+        </div>
+        <div style={{marginTop: 20, opacity: reveal, display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 16, background: pill[1]}}>
+          <div style={{width: 9, height: 9, borderRadius: 5, background: pill[3]}} /><Tx size={16} color={pill[2]}>{pill[0]}</Tx>
+        </div>
+        <div style={{marginTop: 18, opacity: reveal, transform: `translateY(${(1 - reveal) * 16}px)`}}>{rows.map(([label, value, canCopy], i) => {
+          const on = i === 2 && copied > 0 && t < r(S.connected);
+          return <div key={label} style={{display: 'flex', alignItems: 'center', height: 60, marginBottom: 10, padding: '0 16px', borderRadius: 12, background: on ? '#FFF6DF' : '#F6F8FD', boxShadow: on ? `0 0 0 3px ${GOLD}` : 'none'}}>
+            <div style={{width: 200}}><Tx size={14} color={MUTED} style={{letterSpacing: 1.4}}>{label}</Tx></div>
+            <span style={{flex: 1, fontFamily: FM, fontSize: 20, fontWeight: 700, color: i === 0 ? DEEP : NAVY}}>{value}</span>
+            {canCopy && <div style={{width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: i === 2 && copied > 0 ? GREEN : '#E9EEF8'}}><Glyph name={i === 2 && copied > 0.5 ? 'check' : 'copy'} size={18} color={i === 2 && copied > 0 ? '#fff' : SLATE} /></div>}
+          </div>;
+        })}</div>
+      </Panel></In>
+    </Screen>
+    <Spotlight level={L} keys={[Pt(SB(300, 170, 560, 520), r(S.brand)), Pt(SB(890, 170, 616, 520), r(S.dns))]} />
+    <Note at={r(S.connected)} title={T.notify} sub={T.notifySub} icon="globe" />
+    <CursorPath keys={[{t: 0, x: 1650, y: 950}, {t: r(S.save) - 0.35, x: save.x, y: save.y}, {t: r(S.save), x: save.x, y: save.y, click: true}, {t: r(S.copy) - 0.35, x: copy.x, y: copy.y}, {t: r(S.copy), x: copy.x, y: copy.y, click: true}]} />
+  </>;
+};
+
+// ---------- 14. help ----------
 const Help: React.FC = () => {
   const S = SCENES.help, r = rel(S.start), T = TEXT.Help;
   return <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 26}}>
@@ -347,9 +390,9 @@ const Help: React.FC = () => {
   </AbsoluteFill>;
 };
 
-const PARTS: Record<Exclude<SceneKey, 'title'>, React.FC> = {signup: SignUp, dashboards: Dashboards, dashboard: Dashboard, clients: Clients, connections: Connections, ai: AIContent, plans: Plans, tiers: Tiers, billing: Billing, leads: Leads, bulk: Bulk, integrations: Integrations, help: Help};
-const CAPTIONS: Record<Exclude<SceneKey, 'title' | 'help'>, {caption: string; badge: string}> = {signup: TEXT.SignUp, dashboards: TEXT.Dashboards, dashboard: TEXT.Dashboard, clients: TEXT.Clients, connections: TEXT.Connections, ai: TEXT.AI, plans: TEXT.Plans, tiers: TEXT.Tiers, billing: TEXT.Billing, leads: TEXT.Leads, bulk: TEXT.Bulk, integrations: TEXT.Integrations};
-const CAP_C = [BLUE, DEEP, BLUE, ORANGE, GREEN, DEEP, ORANGE, GOLD, GREEN, DEEP, GREEN, ORANGE];
+const PARTS: Record<Exclude<SceneKey, 'title'>, React.FC> = {signup: SignUp, dashboards: Dashboards, dashboard: Dashboard, clients: Clients, connections: Connections, ai: AIContent, plans: Plans, tiers: Tiers, billing: Billing, leads: Leads, bulk: Bulk, integrations: Integrations, whitelabel: Whitelabel, help: Help};
+const CAPTIONS: Record<Exclude<SceneKey, 'title' | 'help'>, {caption: string; badge: string}> = {signup: TEXT.SignUp, dashboards: TEXT.Dashboards, dashboard: TEXT.Dashboard, clients: TEXT.Clients, connections: TEXT.Connections, ai: TEXT.AI, plans: TEXT.Plans, tiers: TEXT.Tiers, billing: TEXT.Billing, leads: TEXT.Leads, bulk: TEXT.Bulk, integrations: TEXT.Integrations, whitelabel: TEXT.Whitelabel};
+const CAP_C = [BLUE, DEEP, BLUE, ORANGE, GREEN, DEEP, ORANGE, GOLD, GREEN, DEEP, GREEN, ORANGE, DEEP];
 
 export const AgencyVideo: React.FC = () => {
   const {fps} = useVideoConfig();

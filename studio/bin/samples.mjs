@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {projectDir, conceptsCompId} from '../server/paths.mjs';
-import {renderStills} from '../server/remotion.mjs';
+import {renderStills, awaitBundleCleanup} from '../server/remotion.mjs';
 
 const [id, only] = process.argv.slice(2);
 if (!id) { console.error('usage: samples.mjs <projectId> [conceptId]'); process.exit(1); }
@@ -25,4 +25,5 @@ for (const c of doc.concepts) {
 const res = await renderStills(specs, {onProgress: (p) => p.file && console.log(`${p.stage} ${Math.round(p.progress * 100)}% ${path.basename(p.file)}`)});
 fs.writeFileSync(file, JSON.stringify(doc, null, 2));
 for (const r of res) console.log(r.ok ? `OK   ${r.out}` : `FAIL ${r.out}: ${r.error}`);
+await awaitBundleCleanup(); // remove the temporary copy of the project before exiting
 process.exit(res.every((r) => r.ok) ? 0 : 1);

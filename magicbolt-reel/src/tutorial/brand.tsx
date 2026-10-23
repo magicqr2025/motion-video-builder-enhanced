@@ -30,7 +30,7 @@ export const TitleCard: React.FC<{title: string; eyebrow?: string; sub?: string;
           <Tx size={26} color={SLATE} w={400} style={{letterSpacing: 7, textTransform: 'uppercase'}}>{eyebrow}</Tx>
         </div>
         <div style={{opacity: kT, transform: `translateY(${(1 - kT) * 30}px)`, filter: `blur(${(1 - kT) * 8}px)`}}>
-          <Tx size={92} g={[NAVY, DEEP, BLUE]}>{title}</Tx>
+          <Tx size={Math.min(92, Math.floor(1700 / (title.length * 0.6)))} g={[NAVY, DEEP, BLUE]}>{title}</Tx>
         </div>
         <div style={{width: 360 * kL, height: 5, borderRadius: 3, background: `linear-gradient(90deg, ${DEEP}, ${BLUE} 45%, ${GOLD} 75%, ${ORANGE})`}} />
         {sub && (

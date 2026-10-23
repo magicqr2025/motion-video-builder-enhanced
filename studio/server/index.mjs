@@ -10,14 +10,17 @@ import {DATA, WEB, REEL, projectDir, projectAssets, projectCode, compId, concept
 import {listPresets, listBrands, getPreset, listProjects, getProject, saveProject, createProject, deleteProject, readConcepts, readStoryboard, listImages, readLog, appendLog} from './projects.mjs';
 import {runAgent, isBusy, stopAgent, busyList} from './agent.mjs';
 import {bindActivity, activityLog, recentActivity, lastActivityAt, startProcess, endProcess, patchProcess, listProcesses, runningProcesses, processesCsv, readHistory, listDays} from './activity.mjs';
-import {conceptsPrompt, buildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, reviewPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
-import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, writeRegistry, STUDIO_PORT} from './remotion.mjs';
+import {conceptsPrompt, buildPrompt, resumeBuildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, reviewPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
+import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, writeRegistry, sweepBundles, STUDIO_PORT} from './remotion.mjs';
 import {transcribeFile} from './transcribe.mjs';
 import {readSettings, writeSettings, publicSettings, updateAi, aiConfig, aiRuntime} from './settings.mjs';
 import {pingModel} from './providers/openai.mjs';
 import {mountTools} from './tools.mjs';
+import {mountFiles} from './files.mjs';
 import {emptyReview, cleanReview, pendingCount, reviewSummary, clearSent} from './review.mjs';
 import {mountStory, stopStory} from './story.mjs';
+import {mountStorage} from './storage.mjs';
+import {ensureDarkCss} from './darkcss.mjs';
 import {convertAnimated, OUTPUT_FORMATS, ANIM_WIDTHS, ANIM_FPS} from './animate.mjs';
 import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges, lookChangePrompt} from './look.mjs';
 
@@ -204,11 +207,42 @@ app.post('/api/projects', wrap(async (req, res) => {
   res.json(p);
 }));
 
+// A build that was cut short: a concept was approved, the video code exists, but storyboard.json was never written.
+const isResumable = (p) => {
+  if (isBusy(p.id) || !p.approvedConcept || readStoryboard(p.id) || !['concepts', 'brief'].includes(p.status)) return false;
+  try { return fs.readdirSync(projectCode(p.id)).some((f) => /\.tsx$/.test(f) && !['Concepts.tsx', 'index.tsx'].includes(f)); } catch { return false; }
+};
+// The build as a checklist, worked out from what exists on disk (so it stays right after a restart or a crash).
+const buildTasks = (p) => {
+  const dir = projectCode(p.id), sb = readStoryboard(p.id);
+  const has = (f) => fs.existsSync(path.join(dir, f));
+  let files = []; try { files = fs.readdirSync(dir).filter((f) => /\.tsx$/.test(f) && !['Concepts.tsx', 'index.tsx'].includes(f)); } catch { /* no code yet */ }
+  // the finished video is a Studio-<id> composition (the concept samples are Studio-<id>-concepts), either in its own file or in index.tsx
+  let registered = false; try { registered = fs.readFileSync(path.join(dir, 'index.tsx'), 'utf8').includes(`'${compId(p.id)}'`); } catch { /* no index yet */ }
+  const frames = listImages(p.id, 'checks').length, hasAudio = (p.assets ?? []).some((a) => ['voiceover', 'music'].includes(a.role));
+  const finals = (p.renders ?? []).filter((r) => !r.draft);
+  return [
+    {key: 'concept', label: 'Concept approved', done: !!p.approvedConcept, detail: p.approvedConcept?.name ?? ''},
+    {key: 'code', label: 'Scenes written in code', done: files.length > 0 || registered, detail: files.length ? `${files.length} file${files.length === 1 ? '' : 's'}` : ''},
+    {key: 'text', label: 'On-screen text made editable', done: has('text.json')},
+    {key: 'audio', label: 'Voiceover and music wired in', done: has('audio.json') || !hasAudio, detail: !hasAudio && !has('audio.json') ? 'no audio added' : ''},
+    {key: 'timing', label: 'Timing and storyboard', done: !!sb, detail: sb ? `${sb.scenes?.length ?? 0} scenes · ${Math.round(Number(sb.durationSec) || 0)} s` : ''},
+    {key: 'checks', label: 'Frames rendered and checked', done: !!sb && frames > 0, detail: frames ? `${frames} frame${frames === 1 ? '' : 's'}` : ''},
+    {key: 'review', label: 'You review and approve', done: !!p.approval},
+    {key: 'render', label: 'Final render', done: finals.length > 0, detail: finals.length ? `${finals.length} render${finals.length === 1 ? '' : 's'}` : ''},
+  ];
+};
+app.get('/api/projects/:id/build-progress', wrap(async (req, res) => {
+  const p = need(req.params.id), log = readLog(p.id), busy = isBusy(p.id);
+  const withTodos = [...log].reverse().find((e) => Array.isArray(e.todos)), lastTool = [...log].reverse().find((e) => e.kind === 'tool');
+  res.json({tasks: buildTasks(p), busy, interrupted: isResumable(p), now: busy ? lastTool?.text ?? '' : '', todos: withTodos?.todos ?? null, todosAt: withTodos?.at ?? null});
+}));
+
 app.get('/api/projects/:id', wrap(async (req, res) => {
   const p = need(req.params.id);
   syncLook(p);
   res.json({project: p, referenceFrames: referenceFrames(p), concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), audio: await fillDurations(p.id), background: readBackground(p.id), style: readStyle(p.id), log: readLog(p.id).slice(-400), busy: isBusy(p.id),
-    compositions: {video: compId(p.id), concepts: conceptsCompId(p.id)}, renderJob: renderJob?.projectId === p.id ? renderJob : null});
+    compositions: {video: compId(p.id), concepts: conceptsCompId(p.id)}, renderJob: renderJob?.projectId === p.id ? renderJob : null, resumable: isResumable(p)});
 }));
 
 app.patch('/api/projects/:id', wrap(async (req, res) => {
@@ -230,8 +264,11 @@ app.delete('/api/projects/:id', wrap(async (req, res) => {
 // ---------- media ----------
 const upload = multer({dest: path.join(DATA, '_uploads'), limits: {fileSize: 4 * 1024 ** 3}});
 // Video tools tab: video -> script / MP3. Shares the one-at-a-time media queue because the speech engine cannot run twice at once.
+mountFiles(app, {wrap, need, saveProject, appendLog, changed, readStoryboard});
 mountTools(app, {upload, wrap, broadcast, enqueue: (fn) => { mediaQueue = mediaQueue.then(fn).catch((e) => console.error(e)); }});
 mountStory(app, {wrap, need, changed, broadcast});
+ensureDarkCss();
+mountStorage(app, {wrap, need, changed, broadcast, busy: () => ({render: renderJob && !renderJob.done ? renderJob.projectId : null, ai: busyList().map((b) => b.id)})});
 app.post('/api/projects/:id/assets', upload.array('files', 30), wrap(async (req, res) => {
   const p = need(req.params.id);
   fs.mkdirSync(projectAssets(p.id), {recursive: true});
@@ -417,6 +454,20 @@ app.post('/api/projects/:id/approve', wrap(async (req, res) => {
   const c = readConcepts(p.id)?.concepts?.find((x) => x.id === conceptId);
   startTurn(p, buildPrompt(p, conceptId, notes), `Approved concept ${c?.name ? `"${c.name}"` : conceptId}${notes ? `: ${notes}` : ''}. Build the full video.`, {
     before: {status: 'building', approvedConcept: {id: conceptId, name: c?.name ?? conceptId, notes}, ...(p.look ? {look: {...p.look, applied: {levels: builtLevels(p.look)}}} : {})},
+    after: (q) => { q.status = readStoryboard(q.id) ? 'review' : 'concepts'; },
+  });
+  res.json({ok: true});
+}));
+
+// Pick a build up again after it was interrupted: same concept and notes, same Claude session, and it keeps what exists.
+app.post('/api/projects/:id/resume-build', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  busyGuard(p.id);
+  if (!p.approvedConcept) throw Object.assign(new Error('No concept was approved for this video yet.'), {status: 400});
+  if (readStoryboard(p.id)) throw Object.assign(new Error('This video is already built.'), {status: 409});
+  const {id: conceptId, name, notes = ''} = p.approvedConcept;
+  startTurn(p, resumeBuildPrompt(p, conceptId, notes), `Resume the build of “${name ?? conceptId}” where it stopped.`, {
+    before: {status: 'building'},
     after: (q) => { q.status = readStoryboard(q.id) ? 'review' : 'concepts'; },
   });
   res.json({ok: true});
@@ -955,11 +1006,14 @@ const server = app.listen(PORT, (err) => {
   if (ai.provider !== 'claude') console.log(`  AI model: ${ai.model} via ${ai.baseUrl} (change it under "AI model" on the home page)\n`);
   else if (process.platform !== 'darwin' && !fs.existsSync(creds)) console.log('  ! Not signed in to Claude Code on this PC. Run "claude" in a terminal and type /login.\n');
   else console.log('  Claude: using your local Claude Code login (no API key)\n');
+  const swept = sweepBundles(10 * 60 * 1000); // leftover render copies in the temp folder from runs that were killed
+  if (swept) activityLog(`Cleared ${swept} old render cop${swept === 1 ? 'y' : 'ies'} from the temp folder (about ${(swept * 0.57).toFixed(1)} GB)`, {level: 'ok'});
   activityLog(`Video Studio started on ${URL_}`, {level: 'ok'});
   if (!process.env.NO_REMOTION_STUDIO) {
     activityLog('Starting the Remotion preview server…');
     let previewReady = false;
     startRemotionStudio((s) => {
+      if (s.startsWith('[preview-')) { activityLog(s.replace(/^\[[^\]]+\]\s*/, ''), {level: s.startsWith('[preview-gave-up]') ? 'error' : 'warn'}); return; }
       if (/error/i.test(s)) { process.stdout.write(`[remotion] ${s}`); activityLog(`Remotion preview: ${clip(s.replace(/\x1b\[[0-9;]*m/g, ''), 200)}`, {level: 'error'}); }
       else if (!previewReady && /ready|http:\/\/localhost/i.test(s)) { previewReady = true; activityLog(`Remotion preview server ready on port ${STUDIO_PORT}`, {level: 'ok'}); }
     });
