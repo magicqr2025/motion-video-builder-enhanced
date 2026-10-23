@@ -10,8 +10,17 @@ import A0 from './intro-waycrm-1m-style-2/audio.json';
 import {COMPOSITIONS as P1} from './kit-demo';
 import {COMPOSITIONS as P2} from './lead-center-loop';
 import {COMPOSITIONS as P3} from './tutorial-animated-screens-2';
-import {COMPOSITIONS as P4} from './untitled-video';
-import A4 from './untitled-video/audio.json';
+import {COMPOSITIONS as P4} from './tutorial-animated-screens-3';
+import A4 from './tutorial-animated-screens-3/audio.json';
+import L4 from './tutorial-animated-screens-3/look.json';
+import {COMPOSITIONS as P5} from './tutorial-animated-screens-4';
+import A5 from './tutorial-animated-screens-4/audio.json';
+import L5 from './tutorial-animated-screens-4/look.json';
+import {COMPOSITIONS as P6} from './untitled-video';
+import A6 from './untitled-video/audio.json';
+import L6 from './untitled-video/look.json';
+import {COMPOSITIONS as P7} from './untitled-video-2';
+import L7 from './untitled-video-2/look.json';
 
 const withAudio = (id: string, comps: StudioComp[], audio: AudioConfig): StudioComp[] =>
   comps.map((c) => (c.id === `Studio-${id}` ? {...c, component: withStudioAudio(c.component, audio)} : c));
@@ -23,7 +32,10 @@ const PROJECTS: [string, StudioComp[]][] = [
   ['kit-demo', P1],
   ['lead-center-loop', P2],
   ['tutorial-animated-screens-2', P3],
-  ['untitled-video', withAudio('untitled-video', P4, A4 as AudioConfig)],
+  ['tutorial-animated-screens-3', withAudio('tutorial-animated-screens-3', withLook(P4, L4 as LookConfig), A4 as AudioConfig)],
+  ['tutorial-animated-screens-4', withAudio('tutorial-animated-screens-4', withLook(P5, L5 as LookConfig), A5 as AudioConfig)],
+  ['untitled-video', withAudio('untitled-video', withLook(P6, L6 as LookConfig), A6 as AudioConfig)],
+  ['untitled-video-2', withLook(P7, L7 as LookConfig)],
 ];
 
 export const StudioCompositions: React.FC = () => (

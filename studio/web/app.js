@@ -1,8 +1,15 @@
 // MagicBolt Video Studio: browser side. Plain JS modules, no build step.
+import {initTools, renderTools, toolsChanged} from './tools.js';
+import {initReview, reviewHtml, reviewEditing} from './review.js';
+import {initStory, storyHTML, renderStory, storyRunning, stopStoryRun, aiFilled, usageHTML} from './story.js';
+import {initActivity, onServerEvent, note, setConnection, refreshContext} from './activity.js';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const api = async (url, opts = {}) => {
-  const res = await fetch(url, {headers: opts.body && !(opts.body instanceof FormData) ? {'Content-Type': 'application/json'} : {}, ...opts, body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body});
+  const res = await fetch(url, {headers: opts.body && !(opts.body instanceof FormData) ? {'Content-Type': 'application/json'} : {}, ...opts, body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body}).catch((e) => {
+    note(`Could not reach the studio server for ${opts.method ?? 'GET'} ${url.split('?')[0]}. Is the Video Studio window still open?`, {level: 'error', source: 'system'});
+    throw e;
+  });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error || res.statusText);
   return j;
@@ -32,17 +39,18 @@ const applyPanelState = () => {
   const layout = $('.layout');
   layout.classList.toggle('left-collapsed', S.leftCollapsed);
   layout.classList.toggle('right-collapsed', S.rightCollapsed);
-  const left = $('#toggle-left'), right = $('#toggle-right');
-  left.textContent = S.leftCollapsed ? 'Show projects' : 'Hide projects';
-  right.textContent = S.rightCollapsed ? 'Show chat' : 'Hide chat';
-  left.setAttribute('aria-expanded', String(!S.leftCollapsed));
-  right.setAttribute('aria-expanded', String(!S.rightCollapsed));
+  $('#ni-chat')?.setAttribute('aria-pressed', String(!S.rightCollapsed));
 };
 applyPanelState();
+// collapsible menu sections (remembered)
+const foldKey = (k) => `studio-fold-${k}`;
+const setFold = (sec, folded) => { sec.classList.toggle('folded', folded); sec.querySelector('.sec-head')?.setAttribute('aria-expanded', String(!folded)); };
+document.querySelectorAll('.side-sec').forEach((sec) => { try { setFold(sec, localStorage.getItem(foldKey(sec.dataset.sec)) === '1'); } catch { /* storage unavailable */ } });
 
 // ---------- routing ----------
 const route = () => {
   const [, kind, id, tab] = location.hash.split('/');
+  if (kind === 'tools') return {id: null, tools: true};
   return kind === 'p' && id ? {id, tab: tab || null} : {id: null};
 };
 const go = (id, tab) => { location.hash = id ? `#/p/${id}/${tab ?? ''}` : '#/'; };
@@ -66,34 +74,61 @@ const bestTab = (p) => ({brief: 'brief', concepting: 'concepts', concepts: 'conc
 const load = async () => {
   const r = route();
   await loadState().catch((e) => toast(e.message));
-  if (!r.id) { S.cur = null; renderHome(); renderChat(); return; }
-  try { await loadProject(r.id); } catch { go(null); return; }
+  if (r.tools) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Video tools</b> · video to script &amp; MP3'; note('Opened Video tools.', {projectId: null}); await renderTools(); refreshContext(); return; }
+  if (!r.id) { S.cur = null; note('Opened the home page.', {projectId: null}); renderHome(); renderChat(); refreshContext(); return; }
+  try { await loadProject(r.id); } catch { note(`Could not open video “${r.id}” (it no longer exists). Going home.`, {level: 'warn', projectId: null}); go(null); return; }
   S.tab = r.tab || bestTab(S.cur.project);
+  note(`Opened “${S.cur.project.title}” · ${TABS.find(([k]) => k === S.tab)?.[1] ?? S.tab}`, {projectId: r.id});
   renderProject();
   renderChat();
+  refreshContext();
 };
 
 // ---------- sidebar ----------
 const renderSide = () => {
   const r = route();
-  $('#projects').innerHTML = S.state.projects.length
-    ? S.state.projects.map((p) => {
+  $('#tools-link')?.classList.toggle('on', !!r.tools);
+  const all = S.state.projects, STEP = 8;
+  S.sideLimit ??= STEP;
+  // the open video always stays in the list, even when it is beyond the current page
+  const shown = all.filter((p, i) => i < S.sideLimit || p.id === r.id);
+  const left = all.length - shown.length;
+  $('#projects').innerHTML = all.length
+    ? shown.map((p) => {
       const [label] = STATUS[p.status] ?? [p.status];
-      return `<a href="#/p/${p.id}/" class="${p.id === r.id ? 'on' : ''}"><div class="t">${p.busy ? '<i class="dot"></i>' : ''}${esc(p.title)}</div><div class="s">${esc(label)}</div></a>`;
+      return `<a href="#/p/${p.id}/" class="${p.id === r.id ? 'on' : ''}" title="${esc(p.title)}"><div class="t">${p.busy ? '<i class="dot"></i>' : ''}<span>${esc(p.title)}</span></div><div class="s">${esc(label)}</div></a>`;
     }).join('')
+      + (left > 0 ? `<button type="button" class="side-more" data-action="side-more">Show ${Math.min(STEP, left)} more <small>· ${left} not shown</small></button>` : '')
+      + (left <= 0 && S.sideLimit > STEP ? '<button type="button" class="side-more" data-action="side-less">Show less</button>' : '')
     : '<div class="muted small" style="padding:0 10px">No videos yet.</div>';
 };
 
+const projectRunning = () => !!S.cur && (S.cur.busy || S.plannerBusy || storyRunning() || !!S.lookAI?.busy || (S.renderJob && !S.renderJob.done && S.renderJob.projectId === S.cur.project.id));
+const syncHeadStop = () => { const b = $('#head-stop'); if (b) { const on = projectRunning(); b.hidden = !on; if (on) b.disabled = false; } };
 const renderRenderPill = () => {
   const j = S.renderJob, el = $('#render-pill');
-  if (!j || j.done) { el.hidden = true; return; }
+  if (!j || j.done) { el.hidden = true; syncHeadStop(); return; }
   el.hidden = false;
+  syncHeadStop();
   el.innerHTML = `<i class="dot"></i> Rendering ${esc(j.projectId)} · ${j.stage} ${Math.round((j.progress ?? 0) * 100)}%`;
 };
 
 // ---------- home: presets ----------
 const presetThumb = (pr) => `/data/_presets/${pr.id}.png`;
 // ---------- AI model settings (home page) ----------
+const CLAUDE_MODELS = [['', 'Default (whatever your Claude Code login uses)'], ['claude-fable-5-1', 'Fable 5.1 (most capable)'], ['claude-opus-5-5', 'Opus 5.5'], ['claude-sonnet-5-5', 'Sonnet 5.5 (faster, cheaper)'], ['claude-haiku-5-5', 'Haiku 5.5 (fastest, simplest videos)']];
+const prettyModel = (id) => ({'claude-fable-5-1': 'Fable 5.1', 'claude-opus-5-5': 'Opus 5.5', 'claude-sonnet-5-5': 'Sonnet 5.5', 'claude-haiku-5-5': 'Haiku 5.5'}[id] ?? (id && id !== 'default' ? id : 'default model'));
+const WHERE = {cloud: 'cloud', local: 'this PC', lan: 'local network'};
+// "Claude Code · Opus 5.5" and the chip "Opus 5.5 · cloud (Anthropic servers)"
+const aiRuntime = () => S.state?.settings?.ai?.runtime ?? null;
+const aiTag = () => { const r = aiRuntime(); return r ? `${r.engine} · ${prettyModel(r.model)}` : null; };
+const aiChip = () => {
+  const r = aiRuntime();
+  if (!r) return null;
+  return {where: r.where, text: `${prettyModel(r.model)} · ${WHERE[r.where] ?? r.where} (${r.host})`,
+    title: `${r.engine}, ${prettyModel(r.model)}.\nThe model itself runs on: ${r.host}.\nWhat it asks for (reading and writing files, commands, rendering frames) runs on: ${r.tools}.`};
+};
+const kTok = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n ?? 0));
 const aiName = () => { const ai = S.state?.settings?.ai; return !ai || ai.provider === 'claude' ? 'Claude' : ai.provider === 'codex' ? 'Codex' : (ai.model || S.state.settings.providers[ai.provider]?.model || 'AI'); };
 const aiCard = () => {
   const st = S.state.settings ?? {};
@@ -103,10 +138,13 @@ const aiCard = () => {
   const isClaude = ai.provider === 'claude';
   const isCodex = ai.provider === 'codex';
   return `<details class="card ai-card" style="margin:0 0 22px" open>
-    <summary class="spread" style="cursor:pointer"><b>AI model</b><span class="muted small">${esc(provs[ai.provider]?.name ?? 'Claude')}${isClaude || isCodex ? '' : ` · ${esc(ai.model || def.model)}`}</span></summary>
+    <summary class="spread" style="cursor:pointer"><b>AI model</b><span class="muted small">${esc(provs[ai.provider]?.name ?? 'Claude')}${isClaude ? ` · ${esc(CLAUDE_MODELS.find(([v]) => v === (ai.model ?? ''))?.[1] ?? ai.model ?? 'default')}` : isCodex ? '' : ` · ${esc(ai.model || def.model)}`}</span></summary>
     <div id="ai-form" style="margin-top:12px;display:grid;gap:10px">
       ${select('ai-provider', 'Provider', ai.provider, Object.entries(provs).map(([k, v]) => [k, v.name]))}
-      ${isClaude ? '<p class="small muted" style="margin:0">Uses the Claude Code login on this PC (run <code>claude</code> and <code>/login</code> once). No API key needed.</p>' : isCodex ? `
+      ${isClaude ? `<p class="small muted" style="margin:0">Uses the Claude Code login on this PC (run <code>claude</code> and <code>/login</code> once). No API key needed.</p>
+        ${select('claude-model', 'Model for building videos', ai.model ?? '', CLAUDE_MODELS)}
+        <p class="small" style="margin:-4px 0 0"><b>Where it runs:</b> the model answers on <b>${esc(ai.runtime?.host ?? 'Anthropic servers')}</b> (your prompts and the files it reads are sent there). Everything it does, reading and writing files, commands and rendering frames, runs on <b>this PC</b>.</p>
+        <p class="small muted" style="margin:-4px 0 0">Applies to every new request (concepts, builds, chat). A request already running keeps its model. If your plan does not include the model, the error shows in the chat panel; switch back to the default.</p>` : isCodex ? `
         <p class="small muted" style="margin:0">Uses the Codex CLI login on this PC. Enter a model ID available in your Codex account's model picker. No API key needed.</p>
         ${field('ai-model', 'Codex model ID', ai.model, {placeholder: 'model ID from your Codex model picker', hint: 'This must be available to your signed-in ChatGPT account.'})}` : `
         ${field('ai-model', 'Model', ai.model, {placeholder: def.model || 'model name', hint: 'The exact model id your provider uses. It must support tool calling; vision is needed to check rendered frames.'})}
@@ -156,8 +194,14 @@ const renderHome = () => {
 
 // ---------- project shell ----------
 const TABS = [['script', 'Reference snapshots'], ['brief', 'Brief'], ['look', 'Look & feel'], ['concepts', 'Concepts'], ['build', 'Build & timing'], ['text', 'Text'], ['style', 'Style'], ['audio', 'Audio'], ['background', 'Background'], ['render', 'Preview & render']];
+const fmtStamp = (iso) => { const d = new Date(iso); return Number.isNaN(+d) ? '' : d.toLocaleString(undefined, {day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit'}); };
+const headMeta = (p, sb) => {
+  const total = sb ? (Number(sb.durationSec) || Math.max(0, ...(sb.scenes ?? []).map((x) => Number(x.end) || 0))) : 0;
+  const stamp = fmtStamp(p.updatedAt);
+  return `${total ? `<span class="pill blue" title="Total video length">⏱ ${fmtT(total)}</span>` : ''}${stamp ? `<span class="muted small" title="Last updated ${esc(new Date(p.updatedAt).toLocaleString())}">Updated ${esc(stamp)}</span>` : ''}`;
+};
 const tabEnabled = (t, p, cur) => !(S.plannerBusy && t === 'brief') && (t === 'script' || t === 'brief' || t === 'look' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard));
-const tabDone = (t, p) => ({brief: p.status !== 'brief', look: !!p.look?.reviewed, concepts: !!p.approvedConcept, build: ['review', 'rendering', 'done'].includes(p.status), text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
+const tabDone = (t, p) => ({brief: p.status !== 'brief', look: !!p.look?.reviewed, concepts: !!p.approvedConcept, build: !!p.approval, text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
 
 const renderProject = () => {
   const {project: p} = S.cur;
@@ -168,11 +212,12 @@ const renderProject = () => {
   const tabs = TABS.map(([k, l], i) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''} ${tabDone(k, p) ? 'done' : ''}" ${tabEnabled(k, p, S.cur) ? '' : 'disabled'}><span class="k">${tabDone(k, p) ? '✓' : i + 1}</span>${l}</button>`).join('');
   $('#main').innerHTML = `
     <div class="spread">
-      <div class="row"><h1 style="font-size:24px">${esc(p.title)}</h1><span class="pill ${tone}">${S.cur.busy ? '<i class="dot"></i>' : ''}${esc(label)}</span></div>
-      <div class="row"><span class="muted small">${p.cost ? `usage ≈ $${p.cost.toFixed(2)}` : ''}</span><button class="btn ghost sm danger" data-action="delete">Delete</button></div>
+      <div class="row"><h1 style="font-size:24px">${esc(p.title)}</h1><span class="pill ${tone}">${S.cur.busy ? '<i class="dot"></i>' : ''}${esc(label)}</span>${headMeta(p, S.cur.storyboard)}<button class="btn sm stop-all" id="head-stop" data-action="stop-all" title="Stop everything running for this video (stops AI usage and renders)" hidden>■ Stop</button></div>
+      <div class="row"><span class="muted small" title="${p.tokens ? esc(`Written ${kTok(p.tokens.output)} · new input ${kTok((p.tokens.input ?? 0) + (p.tokens.cacheWrite ?? 0))} · re-read from cache ${kTok(p.tokens.cacheRead ?? 0)}`) : ''}">${p.cost ? `usage ≈ $${p.cost.toFixed(2)}` : ''}${p.tokens ? `${p.cost ? ' · ' : 'usage '}${kTok((p.tokens.input ?? 0) + (p.tokens.output ?? 0) + (p.tokens.cacheWrite ?? 0))} tokens` : ''}</span><button class="btn ghost sm danger" data-action="delete">Delete</button></div>
     </div>
     <div class="tabs">${tabs}</div>
     <div id="tab"></div>`;
+  syncHeadStop();
   ({script: renderScriptPlanner, brief: renderBrief, look: renderLook, concepts: renderConcepts, build: renderBuild, text: renderText, style: renderStyle, audio: renderAudio, background: renderBackground, render: renderRender}[S.tab] ?? renderBrief)();
 };
 
@@ -218,53 +263,138 @@ const updatePlannerPreflight = () => {
 
 // ---------- 1 · brief ----------
 const field = (name, label, value, {type = 'text', rows, placeholder = '', hint = ''} = {}) => `
-  <label class="f"><span>${label}</span>${rows ? `<textarea name="${name}" rows="${rows}" placeholder="${esc(placeholder)}">${esc(value)}</textarea>` : `<input name="${name}" type="${type}" value="${esc(value)}" placeholder="${esc(placeholder)}" />`}${hint ? `<em>${hint}</em>` : ''}</label>`;
+  <label class="f${aiFilled(name) ? ' ai-filled' : ''}"><span>${label}</span>${rows ? `<textarea name="${name}" rows="${rows}" placeholder="${esc(placeholder)}">${esc(value)}</textarea>` : `<input name="${name}" type="${type}" value="${esc(value)}" placeholder="${esc(placeholder)}" />`}${hint ? `<em>${hint}</em>` : ''}</label>`;
 const select = (name, label, value, opts) => `<label class="f"><span>${label}</span><select name="${name}">${opts.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o || '(preset default)']; return `<option value="${esc(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select></label>`;
+
+initStory({S, api: (...a) => api(...a), toast: (...a) => toast(...a), field, select, LANGS, flushSave: () => flushSave(), setBrief: (...a) => setBrief(...a), aiTag, onBusy: () => syncHeadStop(), onChange: () => updateRail(), onFilled: () => renderProject()});
+const OUT_FORMATS = [['mp4', 'MP4', 'video with sound'], ['gif', 'GIF', 'loops · no sound'], ['webp', 'WebP', 'animated · no sound']];
+const ANIM_SIZES = [[480, 'Small', '480 px'], [720, 'Medium', '720 px'], [1080, 'Large', '1080 px']];
+const ANIM_FPS_OPTS = [[10, '10 fps', 'smallest'], [15, '15 fps'], [24, '24 fps', 'smoothest']];
+const outFmt = (b) => (OUT_FORMATS.some((o) => o[0] === b.outputFormat) ? b.outputFormat : 'mp4');
+const outputPicker = (b) => {
+  const f = outFmt(b), anim = f !== 'mp4', secs = Number(b.durationSec) || Math.round(((String(b.script ?? '').trim().match(/\S+/g) ?? []).length) / 2.5);
+  return `${optField('Output format', optGroup('data-outfmt', f, OUT_FORMATS), f === 'mp4' ? 'Best quality, with sound. Use for YouTube, Instagram, WhatsApp and ads.' : f === 'gif' ? 'Works everywhere, even in email and chat. Large files and 256 colours, so keep it short.' : 'Smaller and sharper than GIF. Works in browsers, WhatsApp and most apps.', 'outputFormat')}
+    ${anim ? `<div class="anim-opts">${optField('Animation size', optGroup('data-animw', Number(b.animWidth) || 480, ANIM_SIZES))}${optField('Animation frame rate', optGroup('data-animfps', Number(b.animFps) || 15, ANIM_FPS_OPTS))}
+      ${secs > 20 ? `<div class="st-note" style="grid-column:1/-1">This is about ${secs} seconds long. ${f.toUpperCase()}s that long make very large files. Under 15 seconds works best, or use MP4.</div>` : ''}</div>` : ''}`;
+};
+const BSECS = [['basics', 1, 'Basics'], ['story', 2, 'Story'], ['format', 3, 'Format'], ['look', 4, 'Look'], ['media', 5, 'Media']];
+const bsecFolded = (k) => { try { return localStorage.getItem(`studio-bsec-${k}`) === '1'; } catch { return false; } };
+const bsec = (key, n, title, sub, summary, body) => `
+  <section class="bsec ${bsecFolded(key) ? 'folded' : ''}" data-bsec="${key}" id="bsec-${key}">
+    <button type="button" class="bsec-head" data-action="bsec-fold" aria-expanded="${!bsecFolded(key)}"><span class="n">${n}</span><span class="bt"><b>${title}</b><small>${sub}</small></span><span class="bsum">${summary}</span><i class="sec-chev" aria-hidden="true">▾</i></button>
+    <div class="bsec-body">${body}</div>
+  </section>`;
+const storySummary = (b, p) => {
+  const n = (String(b.script ?? '').trim().match(/\S+/g) ?? []).length;
+  if (!n) return 'not started';
+  return b.scriptState === 'review' ? `script in review · ${n} words` : (b.scriptState === 'approved' || (b.scriptState === undefined && p.status !== 'brief')) ? `script approved · ${n} words` : `${n} words`;
+};
+
+// segmented option group: opts = [[value, label, sub?]]
+const optGroup = (attr, current, opts) => `<div class="opts" role="radiogroup">${opts.map(([v, l, sub]) => `<button type="button" role="radio" aria-checked="${String(v) === String(current ?? '')}" class="opt ${String(v) === String(current ?? '') ? 'on' : ''}" ${attr}="${esc(v)}"><b>${esc(l)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</button>`).join('')}</div>`;
+const optField = (label, html, hint = '', key = '') => `<div class="f${key && aiFilled(key) ? ' ai-filled' : ''}"><span class="fl">${label}</span>${html}${hint ? `<em>${hint}</em>` : ''}</div>`;
+const DURS = [['', 'Auto', 'from voiceover'], [15, '15 s'], [30, '30 s'], [45, '45 s'], [60, '1 min'], [90, '90 s']];
+const MOODS = ['Glossy', 'Premium', 'Playful', 'Minimal', 'Bold', 'Cinematic', 'Warm', 'Techy', 'Calm', 'Fast cuts', 'Lots of motion', 'Clean'];
+const moodList = (t) => String(t ?? '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+const sizeCard = ([l, w, h], b) => {
+  const k = 30, bw = w >= h ? k : Math.max(10, Math.round(k * w / h)), bh = h >= w ? k : Math.max(10, Math.round(k * h / w));
+  return `<button type="button" role="radio" aria-checked="${b.width === w && b.height === h}" class="size-card ${b.width === w && b.height === h ? 'on' : ''}" data-size="${w}x${h}"><span class="ar-box"><i style="width:${bw}px;height:${bh}px"></i></span><b>${esc(l.split(' ')[0])}</b><small>${esc(l.split(' ').slice(1).join(' '))} · ${w}×${h}</small></button>`;
+};
+
+// what is ready, shown in the right-hand rail
+const readiness = () => {
+  const {project: p} = S.cur, b = p.brief, has = (v) => String(v ?? '').trim().length > 0;
+  const approvedScript = b.scriptState === 'approved' || (b.scriptState === undefined && has(b.script) && p.status !== 'brief');
+  const items = [
+    ['Video title', has(p.title), 'basics', ''],
+    ['Script written', has(b.script), 'story', ''],
+    ['Script approved', approvedScript, 'story', ''],
+    ['Audience', has(b.audience), 'story', ''],
+    ['Call to action', has(b.cta), 'story', ''],
+    ['Colours', (b.colors ?? []).length > 0, 'look', ''],
+    ['Voiceover, footage or logo', p.assets.some((x) => ['voiceover', 'footage', 'logo', 'image'].includes(x.role)), 'media', 'optional'],
+  ];
+  return items;
+};
+const briefActions = () => {
+  const {project: p} = S.cur;
+  return `${S.cur.concepts ? '<button type="button" class="btn" data-tab="concepts">View concepts</button>' : ''}
+    ${!S.cur.concepts && !p.look?.reviewed ? `<button type="button" class="btn" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>Skip, generate concepts</button>
+    <button type="button" class="btn primary lg" data-tab="look">Next: Look &amp; feel →</button>` : `<button type="button" class="btn" data-tab="look">Look &amp; feel</button>
+    <button type="button" class="btn primary lg" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>${S.cur.concepts ? 'Regenerate concepts' : 'Generate concepts'} →</button>`}`;
+};
+const railHTML = () => {
+  const {project: p} = S.cur, b = p.brief, items = readiness(), req = items.filter((i) => i[3] !== 'optional'), done = req.filter((i) => i[1]).length, pct = Math.round(done / req.length * 100);
+  const words = (String(b.script ?? '').trim().match(/\S+/g) ?? []).length, size = SIZES.find(([, w, h]) => w === b.width && h === b.height);
+  const brand = S.state.brands.find((x) => x.id === b.brandId);
+  const stat = (k, v) => `<div class="rs"><span>${k}</span><b>${v}</b></div>`;
+  return `
+    <div class="rail-card">
+      <div class="spread"><h4>Readiness</h4><span class="small muted">${done} of ${req.length}</span></div>
+      <div class="bar"><i style="width:${Math.max(4, pct)}%"></i></div>
+      <ul class="rail-list">${items.map(([l, ok, key, tag]) => `<li><button type="button" class="${ok ? 'ok' : 'todo'}" data-action="bsec-go" data-key="${key}"><span class="tick">${ok ? '✓' : ''}</span><span>${l}</span>${tag ? `<small>${tag}</small>` : ''}</button></li>`).join('')}</ul>
+    </div>
+    <div class="rail-card">
+      <h4>At a glance</h4>
+      ${stat('Spoken length', words ? `≈ ${fmtT(words / 2.5).replace(/\.\d$/, '')}` : '–')}
+      ${stat('Words', words || '–')}
+      ${stat('Format', `${size ? size[0].split(' ')[0] + ' · ' : ''}${b.width}×${b.height}`)}
+      ${stat('Frame rate', `${b.fps} fps`)}
+      ${stat('Target length', b.durationSec ? `${b.durationSec} s` : 'auto')}
+      ${stat('Output', outFmt(b).toUpperCase())}
+      ${stat('Brand', esc(brand?.name ?? 'Custom'))}
+      ${stat('Files', p.assets.length)}
+    </div>
+    <div class="rail-card rail-actions">${briefActions()}</div>`;
+};
+const updateRail = () => { const el = $('#brief-rail'); if (el) el.innerHTML = railHTML(); };
 
 const renderBrief = () => {
   const {project: p} = S.cur, b = p.brief;
   const preset = S.state.presets.find((x) => x.id === p.presetId);
-  const brands = S.state.brands;
+  const brands = S.state.brands, moods = moodList(b.style).map((x) => x.toLowerCase());
   $('#tab').innerHTML = `
     <form id="brief" autocomplete="off">
+      <div class="brief-head"><div><h2>Brief</h2><p class="muted small">Tell the studio what to make. Everything saves as you type.</p></div><span class="pill save" id="save-state">Changes save automatically.</span></div>
       ${preset ? `<div class="preset-banner"><img src="${presetThumb(preset)}" alt="" onerror="this.remove()" /><div><b>${esc(preset.name)}</b><div class="small muted" style="margin-top:3px">${esc(preset.tagline)}</div>${preset.asks?.length ? `<div class="small" style="margin-top:6px"><b>This preset needs:</b> ${preset.asks.map(esc).join(' · ')}</div>` : ''}</div></div>` : ''}
 
-      <div class="section-title"><span class="n">1</span><h2>Basics</h2></div>
+      <div class="brief-wrap">
+      <div class="brief-main">
+      <nav class="bnav" aria-label="Sections on this page">${BSECS.map(([k, , t]) => { const r = readiness().filter((i) => i[2] === k && i[3] !== 'optional'); return `<button type="button" class="${r.length ? (r.every((i) => i[1]) ? 'ok' : 'todo') : ''}" data-action="bsec-go" data-key="${k}">${r.length && r.every((i) => i[1]) ? '✓ ' : ''}${t}</button>`; }).join('')}</nav>
+
+      ${bsec('basics', 1, 'Basics', 'name, preset and brand', `${esc(p.title)}`, `
       <div class="card grid g3">
-        ${field('title', 'Video title', p.title)}
+        ${field('title', 'Video title', p.title, {placeholder: 'e.g. White label setup in 3 steps'})}
         ${select('presetId', 'Preset (reusable look)', p.presetId ?? '', [['', 'Blank (no preset)'], ...S.state.presets.map((x) => [x.id, x.name])])}
         ${select('brandId', 'Brand kit', b.brandId, [...brands.map((x) => [x.id, x.name]), ['custom', 'Custom colours']])}
-      </div>
+      </div>`)}
 
-      <div class="section-title"><span class="n">2</span><h2>Story</h2><span class="muted small">what it says and why</span></div>
-      <div class="card grid g2">
-        ${field('idea', 'Idea / goal', b.idea, {rows: 4, placeholder: 'e.g. Show agencies how to set up the white label in 3 steps, so support tickets drop.'})}
-        <div class="stack">${field('audience', 'Audience', b.audience, {placeholder: 'e.g. Indian digital agencies, local business owners'})}${field('cta', 'Call to action', b.cta, {placeholder: 'e.g. Start your free trial at www.magicbolt.ai'})}</div>
-        ${field('script', 'Script / voiceover text', b.script, {rows: 7, placeholder: 'Paste the script. One sentence per line works best. If you upload a voiceover, Claude transcribes it and syncs to it.'})}
-        <div class="stack">${select('language', 'Language', b.language, LANGS)}${field('onScreen', 'Key on-screen text', b.onScreen, {rows: 4, placeholder: 'Headlines, prices, numbers that must appear exactly.'})}</div>
-      </div>
+      ${bsec('story', 2, 'Story', 'start from an idea or a script', storySummary(b, p), '<div class="card st-card" id="story-card"></div>')}
 
-      <div class="section-title"><span class="n">3</span><h2>Format</h2></div>
+      ${bsec('format', 3, 'Format', 'size, frame rate, length and output', `${b.width}×${b.height} · ${b.fps} fps · ${outFmt(b).toUpperCase()}`, `
       <div class="card stack">
-        <div class="chips">${SIZES.map(([l, w, h]) => `<button type="button" class="chip ${b.width === w && b.height === h ? 'on' : ''}" data-size="${w}x${h}"><i class="ar" style="width:${Math.round(w / Math.max(w, h) * 18)}px;height:${Math.round(h / Math.max(w, h) * 18)}px"></i>${l}</button>`).join('')}</div>
-        <div class="grid g4">
-          ${field('width', 'Width (px)', b.width, {type: 'number'})}${field('height', 'Height (px)', b.height, {type: 'number'})}
-          ${select('fps', 'Frame rate', b.fps, [[24, '24 fps'], [25, '25 fps'], [30, '30 fps'], [60, '60 fps']])}
-          ${field('durationSec', 'Target length (s)', b.durationSec ?? '', {type: 'number', placeholder: 'auto from voiceover'})}
-        </div>
-      </div>
+        ${optField('Size', `<div class="size-grid" role="radiogroup">${SIZES.map((x) => sizeCard(x, b)).join('')}</div>`)}
+        ${optField('Frame rate', optGroup('data-fps', b.fps, [[24, '24'], [25, '25'], [30, '30'], [60, '60']]))}
+        ${optField('Target length', optGroup('data-dur', b.durationSec ?? '', DURS), 'Leave on Auto when you have a voiceover: the video follows it.', 'durationSec')}
+        ${outputPicker(b)}
+        <details class="adv"><summary>Custom size and length</summary>
+          <div class="grid g3" style="margin-top:12px">
+            ${field('width', 'Width (px)', b.width, {type: 'number'})}${field('height', 'Height (px)', b.height, {type: 'number'})}
+            ${field('durationSec', 'Length (seconds)', b.durationSec ?? '', {type: 'number', placeholder: 'auto from voiceover'})}
+          </div>
+        </details>
+      </div>`)}
 
-      <div class="section-title"><span class="n">4</span><h2>Look</h2></div>
+      ${bsec('look', 4, 'Look', 'colours, mood and captions', `${(b.colors ?? []).length} colours`, `
       <div class="card stack">
         <div class="spread"><label class="f" style="margin:0"><span>Colours</span></label><button type="button" class="btn ghost sm" data-action="brand-palette">Use brand palette</button></div>
-        <div class="swatches" id="swatches">${(b.colors ?? []).map((c, i) => `<div class="sw" style="background:${esc(c)}" title="${esc(c)}"><input type="color" value="${esc(c)}" data-color="${i}" /><button type="button" class="x" data-action="rm-color" data-i="${i}">✕</button></div>`).join('')}<button type="button" class="sw-add" data-action="add-color" title="Add colour">＋</button></div>
-        <div class="grid g2">
-          ${field('style', 'Style words / mood', b.style, {placeholder: 'e.g. glossy, premium, playful, fast cuts, lots of motion'})}
-          ${select('captions', 'Captions', b.captions, CAPTIONS)}
-        </div>
-      </div>
+        <div class="swatches" id="swatches">${(b.colors ?? []).map((c, i) => `<div class="swc"><div class="sw" style="background:${esc(c)}" title="${esc(c)}"><input type="color" value="${esc(c)}" data-color="${i}" /><button type="button" class="x" data-action="rm-color" data-i="${i}">✕</button></div><code>${esc(String(c).toUpperCase())}</code></div>`).join('')}<button type="button" class="sw-add" data-action="add-color" title="Add colour">＋</button></div>
+        ${field('style', 'Style words / mood', b.style, {placeholder: 'e.g. glossy, premium, playful, fast cuts, lots of motion'})}
+        <div class="moods">${MOODS.map((m) => `<button type="button" class="mood ${moods.includes(m.toLowerCase()) ? 'on' : ''}" data-mood="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+        ${optField('Captions', optGroup('data-caption', b.captions ?? '', CAPTIONS.map((c) => [c, c || 'Preset default'])), '', 'captions')}
+      </div>`)}
 
-      <div class="section-title"><span class="n">5</span><h2>Media & references</h2><span class="muted small">voiceover, music, logo, images, footage, reference videos</span></div>
+      ${bsec('media', 5, 'Media & references', 'voiceover, music, logo, images, footage, reference videos', `${p.assets.length} file${p.assets.length === 1 ? '' : 's'}`, `
       <div class="card">
         <div class="drop" id="drop"><b>Drop files here</b> or click to upload<div class="small muted" style="margin-top:4px">Voiceovers are transcribed for timing · reference videos are turned into frames Claude can study</div></div><input type="file" id="file" multiple hidden />
         <div class="assets" id="assets"></div>
@@ -272,18 +402,18 @@ const renderBrief = () => {
       <div class="card grid g2" style="margin-top:16px">
         ${field('links', 'Links (one per line)', b.links, {rows: 4, placeholder: 'Websites, product pages, YouTube/Instagram references…'})}
         ${field('notes', 'Notes · do & don\'t', b.notes, {rows: 4, placeholder: 'e.g. No stock photos. Keep the logo big at the end. Prices in INR.'})}
+      </div>`)}
+      </div>
+      <aside class="brief-rail" id="brief-rail" aria-label="Brief summary"></aside>
       </div>
 
       <div class="sticky-bar">
-        <div class="small muted" id="save-state">Changes save automatically.</div>
-        <div class="row">
-          ${S.cur.concepts ? '<button type="button" class="btn" data-tab="concepts">View concepts</button>' : ''}
-          ${!S.cur.concepts && !p.look?.reviewed ? `<button type="button" class="btn" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>Skip, generate concepts</button>
-          <button type="button" class="btn primary lg" data-tab="look">Next: Look &amp; feel →</button>` : `<button type="button" class="btn" data-tab="look">Look &amp; feel</button>
-          <button type="button" class="btn primary lg" data-action="gen-concepts" ${S.cur.busy ? 'disabled' : ''}>${S.cur.concepts ? 'Regenerate concepts' : 'Generate concepts'} →</button>`}
-        </div>
+        <div class="small muted">Review the sections above, then continue.</div>
+        <div class="row">${briefActions()}</div>
       </div>
     </form>`;
+  $('#story-card').innerHTML = storyHTML();
+  updateRail();
   renderAssets();
 };
 
@@ -327,7 +457,7 @@ const renderProjectCrumbs = () => {
   const p = S.cur.project, preset = S.state.presets.find((x) => x.id === p.presetId);
   $('#crumbs').innerHTML = `<b>${esc(p.title)}</b> · ${esc(preset?.name ?? 'Blank')} · ${p.brief.width}×${p.brief.height}`;
 };
-const setBrief = (k, v) => { S.cur.project.brief[k] = v; queueSave({brief: {...(pending.brief ?? {}), [k]: v}}); };
+const setBrief = (k, v) => { S.cur.project.brief[k] = v; queueSave({brief: {...(pending.brief ?? {}), [k]: v}}); updateRail(); };
 
 const uploadFiles = async (files) => {
   if (!files.length) return;
@@ -342,6 +472,9 @@ const uploadFiles = async (files) => {
   } catch (e) { toast(e.message); }
 };
 
+// "what is it doing right now" panel for waiting screens; the Activity module fills it from the live feed
+const liveBox = () => `<div class="live"><div class="live-head"><span>Running for <b data-live-elapsed>0:00</b></span><span class="live-quiet" data-live-quiet></span></div><div data-live-steps></div></div>`;
+
 // ---------- 2 · concepts ----------
 const renderConcepts = () => {
   const {project: p, concepts: doc, busy} = S.cur;
@@ -352,7 +485,7 @@ const renderConcepts = () => {
       const started = Number(localStorage.getItem(key)) || Date.now();
       localStorage.setItem(key, String(started));
       const lastTool = [...(p.log ?? [])].reverse().find((e) => e.kind === 'tool');
-      $('#tab').innerHTML = `<div class="card waiting"><div class="spinner"></div><h2>Designing concepts</h2><p>Working from your brief and local references. This pass skips link fetching and audio transcription.</p><p class="small muted">Elapsed: <b id="concept-elapsed">0:00</b></p><p class="small" id="concept-activity">${esc(lastTool?.text || 'Planning two concept directions...')}</p><button type="button" class="btn danger" data-action="stop">Stop generation</button></div>`;
+      $('#tab').innerHTML = `<div class="card waiting"><div class="spinner"></div><h2>Designing concepts</h2><p>Working from your brief and local references. This pass skips link fetching and audio transcription.</p><p class="small muted">Elapsed: <b id="concept-elapsed">0:00</b></p><p class="small" id="concept-activity">${esc(lastTool?.text || 'Planning two concept directions...')}</p>${liveBox()}<button type="button" class="btn danger" data-action="stop" style="margin-top:16px">Stop generation</button></div>`;
       const tick = () => { const el = $('#concept-elapsed'); if (el) { const sec = Math.floor((Date.now() - started) / 1000); el.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; } };
       tick(); S.conceptTimer = setInterval(tick, 1000);
     } else {
@@ -366,7 +499,7 @@ const renderConcepts = () => {
   const portrait = p.brief.height > p.brief.width;
   const approved = p.approvedConcept?.id;
   $('#tab').innerHTML = `
-    ${busy ? '<div class="card row" style="margin-bottom:16px"><div class="spinner" style="width:22px;height:22px;border-width:3px;margin:0"></div><b>Claude is working…</b><span class="muted">samples refresh when done</span></div>' : ''}
+    ${busy ? `<div class="card row" style="margin-bottom:16px"><div class="spinner" style="width:22px;height:22px;border-width:3px;margin:0"></div><b>Claude is working…</b><span class="live-line" data-live-last></span><span class="muted">samples refresh when done</span></div>` : ''}
     ${doc.analysis?.length ? `<div class="card" style="margin-bottom:18px"><h3>What Claude understood</h3><ul class="analysis">${[].concat(doc.analysis).map((a) => `<li>${esc(a)}</li>`).join('')}</ul></div>` : ''}
     <div class="concepts">${doc.concepts.map((c) => `
       <div class="concept ${approved === c.id ? 'approved' : ''}">
@@ -398,26 +531,10 @@ const renderConcepts = () => {
 const renderBuild = () => {
   const {project: p, storyboard: sb, checks, busy} = S.cur;
   if (!sb) {
-    $('#tab').innerHTML = `<div class="card waiting"><div class="spinner"></div><h2>Building “${esc(p.approvedConcept?.name ?? 'your video')}”</h2><p>Claude is writing the scenes, syncing them to the voiceover and checking frames. The timing appears here when it's ready.</p></div>`;
+    $('#tab').innerHTML = `<div class="card waiting"><div class="spinner"></div><h2>Building “${esc(p.approvedConcept?.name ?? 'your video')}”</h2><p>Claude is writing the scenes, syncing them to the voiceover and checking frames. The timing appears here when it's ready.</p>${liveBox()}${busy ? '<button type="button" class="btn danger" data-action="stop" style="margin-top:16px">Stop</button>' : ''}</div>`;
     return;
   }
-  const total = sb.durationSec || sb.scenes?.at(-1)?.end || 1;
-  const ticks = Array.from({length: 6}, (_, i) => fmtT((total * i) / 5));
-  $('#tab').innerHTML = `
-    ${busy ? '<div class="card row" style="margin-bottom:16px"><div class="spinner" style="width:22px;height:22px;border-width:3px;margin:0"></div><b>Claude is updating the video…</b></div>' : ''}
-    <div class="card">
-      <div class="spread"><h2>Timeline</h2><div class="row"><span class="pill blue">${fmtT(total)} total</span><span class="pill">${sb.scenes?.length ?? 0} scenes</span><span class="pill">${sb.width}×${sb.height} · ${sb.fps} fps</span>${(sb.audio ?? []).map((a) => `<span class="pill">♪ ${esc(a)}</span>`).join('')}</div></div>
-      <div class="timeline" style="margin-top:14px">${(sb.scenes ?? []).map((s, i) => `<div style="flex:${Math.max(0.01, s.end - s.start)};background:${SCENE_COLORS[i % SCENE_COLORS.length]}" title="${esc(s.name)} · ${fmtT(s.start)}–${fmtT(s.end)}">${esc(s.name)}</div>`).join('')}</div>
-      <div class="ticks">${ticks.map((t) => `<span>${t}</span>`).join('')}</div>
-    </div>
-    <div class="card" style="margin-top:16px;padding:8px 12px">
-      <table class="sb"><thead><tr><th>#</th><th>Time</th><th>Scene</th><th>On screen</th><th>Voiceover</th><th>Visual</th></tr></thead><tbody>
-      ${(sb.scenes ?? []).map((s, i) => `<tr><td><b>${s.n ?? i + 1}</b></td><td class="tm">${fmtT(s.start)} – ${fmtT(s.end)}<div class="muted small">${(s.end - s.start).toFixed(1)} s</div></td><td><b>${esc(s.name)}</b></td><td>${esc(s.onScreen)}</td><td class="muted">${esc(s.vo)}</td><td class="muted">${esc(s.visual)}</td></tr>`).join('')}
-      </tbody></table>
-    </div>
-    ${checks.length ? `<div class="section-title"><h2>Check frames</h2><span class="muted small">rendered by Claude to verify the build · click to zoom</span></div>
-      <div class="checks">${checks.map((c) => `<div class="shot" data-zoom="/data/${p.id}/${c}${bust()}" data-cap="${esc(c.split('/').pop())}"><img loading="lazy" src="/data/${p.id}/${c}${bust()}" alt="" /><span>${esc(c.split('/').pop().replace(/\.(png|jpe?g)$/, ''))}</span></div>`).join('')}</div>` : ''}
-    <div class="sticky-bar"><div class="small muted">Want changes? Tell Claude in the panel on the right, e.g. “make scene 3 two seconds longer”.</div><button class="btn primary lg" data-tab="render">Preview & render →</button></div>`;
+  $('#tab').innerHTML = reviewHtml();
 };
 
 // ---------- text: edit src/studio/<id>/text.json directly ----------
@@ -603,37 +720,67 @@ const saveLook = async (edit) => {
   S.lookChanges = r.changes;
   renderLook();
 };
+const LOOK_TAG = {layer: ['Live', 'Shows in the preview right away. No AI cost.', ''], built: ['Claude builds', 'Claude designs this into the video when it builds it.', 'b']};
+const lgFolded = (id) => { try { return localStorage.getItem(`studio-lg-${id}`) === '1'; } catch { return false; } };
+const lookTick = () => { const el = document.querySelector('[data-look-time]'); if (el && S.lookAI?.busy) { const sec = Math.round((Date.now() - S.lookAI.startedAt) / 1000); el.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} elapsed · usually 10 to 30 s`; } };
 const renderLook = () => {
   const {project: p, storyboard, busy, compositions} = S.cur;
   const spec = S.state.lookSpec;
   const st = lookState();
   const built = !!storyboard;
   const changes = built ? lookChangesLocal(p.look) : [];
-  const total = Object.values(st.levels).filter((v) => v > 0).length;
+  const items = spec.groups.flatMap((g) => g.items);
+  const onItems = items.filter((i) => (st.levels[i.key] ?? 0) > 0);
+  const total = onItems.length;
+  const ai = S.lookAI ?? {};
   const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const hasStory = !!(String(p.brief.script ?? '').trim() || String(p.brief.idea ?? '').trim());
   $('#tab').innerHTML = `
-    <div class="card" style="margin-bottom:18px"><div class="spread"><div><h2>Look &amp; feel</h2>
-      <div class="muted small" style="max-width:760px;margin-top:4px">Choose the effects, motion and extras <b>before</b> Claude designs concepts, so the concept frames already show them and the full build is right the first time. Each card plays a small sample. <span class="tagc">Instant</span> options are applied by the app as a finishing layer (no AI cost, live preview). <span class="tagc b">Built by Claude</span> options are designed into the video.</div></div>
-      <span class="pill ${total ? 'blue' : ''}">${total} option${total === 1 ? '' : 's'} on</span></div>
-      <div class="bundles" style="margin-top:14px">${spec.bundles.map((b) => `<button type="button" class="bundle ${st.bundle === b.id ? 'on' : ''}" data-look-bundle="${b.id}"><b>${esc(b.name)}</b><span>${esc(b.tagline)}</span></button>`).join('')}</div></div>
-    ${built ? `<div class="card" style="margin-bottom:18px"><div class="spread"><b>Live preview</b><span class="muted small">Instant options show here as you change them. Motion blur and sound effects appear in the final render.</span></div><div class="preview" style="height:340px;margin-top:10px"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div></div>` : ''}
-    <div class="look-groups">${spec.groups.map((g) => `<div class="look-group"><h3>${esc(g.title)}</h3><div class="look-grid">${g.items.map((it) => {
-      const lv = st.levels[it.key] ?? 0;
-      return `<div class="look-card ${lv ? 'on' : ''}"><div class="ld">${lookDemo(it.key, st.gradeMood)}</div>
-        <div class="t"><span>${esc(it.title)}</span><span class="tagc ${it.kind === 'built' ? 'b' : ''}">${it.kind === 'built' ? 'Built by Claude' : 'Instant'}</span></div>
-        <div class="d">${esc(it.desc)}</div>
-        <div class="seg">${LOOK_LV.map((l, n) => `<button type="button" class="${lv === n ? 'on' : ''}" data-look-key="${it.key}" data-look-level="${n}">${l}</button>`).join('')}</div>
-        <div class="lv">${lv ? esc(lv === 2 ? it.full : it.light) : ''}</div>
-        ${it.key === 'grade' && lv ? `<select data-look-mood>${spec.moods.map((m) => `<option ${m === st.gradeMood ? 'selected' : ''}>${m}</option>`).join('')}</select>` : ''}
-      </div>`;
-    }).join('')}</div></div>`).join('')}</div>
+    <div class="card look-intro">
+      <h2>Look &amp; feel</h2>
+      <p class="muted">Choose how your video feels: motion, colour and extras. It is all optional, and you can change it later.</p>
+      <ol class="howto">
+        <li><span class="hn">1</span><div><b>Pick a style</b><small>Press “Let AI choose for me”, or tap a ready-made style below.</small></div></li>
+        <li><span class="hn">2</span><div><b>Fine-tune</b><small>Each card is one feature. <i>Off</i> = not used, <i>Light</i> = subtle, <i>Full</i> = strong. The small animation shows what it does.</small></div></li>
+        <li><span class="hn">3</span><div><b>Continue</b><small>Press “${built ? 'Preview &amp; render' : 'Generate concepts'}”. Claude uses your choices.</small></div></li>
+      </ol>
+      <div class="look-ai">
+        <button type="button" class="btn primary lg" data-action="look-suggest" ${ai.busy || busy ? 'disabled' : ''} title="${hasStory ? 'The AI reads your idea and script and picks the options for you' : 'Write your idea or script on the Brief page first'}">✦ Let AI choose for me</button>
+        <button type="button" class="btn" data-action="look-reset" ${total && !ai.busy ? '' : 'disabled'}>Reset all to Off</button>
+        <span class="pill ${total ? 'blue' : ''}">${total} option${total === 1 ? '' : 's'} on</span>
+        ${!hasStory ? '<span class="small muted">Tip: write your idea or script first so the AI can choose well.</span>' : ''}
+      </div>
+      ${ai.busy ? `<div class="st-run"><div class="st-run-top"><i class="dot"></i><b>The AI is choosing the options…</b><span class="muted small" data-look-time></span><button type="button" class="btn ghost sm" data-action="stop-all">Stop</button></div><div class="bar indet"><i></i></div></div>` : ''}
+      ${ai.error ? `<div class="st-err">${esc(ai.error)}</div>` : ''}
+      ${ai.reason ? `<div class="look-why"><span class="pill ai">✦ Why the AI chose this</span><p>${esc(ai.reason)}</p>${usageHTML(ai.usage)}</div>` : ''}
+      ${onItems.length ? `<div class="look-on"><span class="small muted">Switched on:</span> ${onItems.map((i) => `<span class="pill ${st.levels[i.key] === 2 ? 'blue' : ''}" title="${LOOK_LV[st.levels[i.key]]}">${esc(i.title)}${st.levels[i.key] === 2 ? ' · Full' : ''}</span>`).join(' ')}</div>` : ''}
+      <div class="look-sub"><b>Ready-made styles</b><div class="bundles">${spec.bundles.map((b) => `<button type="button" class="bundle ${st.bundle === b.id ? 'on' : ''}" data-look-bundle="${b.id}"><b>${esc(b.name)}</b><span>${esc(b.tagline)}</span></button>`).join('')}</div></div>
+      <div class="look-legend small muted"><span class="tagc" title="${LOOK_TAG.layer[1]}">Live</span> shows in the preview straight away, no AI cost <span class="sep">·</span> <span class="tagc b" title="${LOOK_TAG.built[1]}">Claude builds</span> Claude designs it into the video (uses AI when it builds)</div>
+    </div>
+    ${built ? `<div class="card" style="margin-bottom:14px"><div class="spread"><b>Live preview</b><span class="muted small">Options tagged “Live” show here as you change them. Motion blur and sound effects appear in the final render.</span></div><div class="preview" style="height:340px;margin-top:10px"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div></div>` : ''}
+    <div class="look-groups">${spec.groups.map((g) => {
+      const on = g.items.filter((it) => (st.levels[it.key] ?? 0) > 0).length, folded = lgFolded(g.id);
+      return `<section class="look-group ${folded ? 'folded' : ''}" data-lg="${g.id}">
+        <button type="button" class="lg-head" data-action="lg-fold" aria-expanded="${!folded}"><b>${esc(g.title)}</b><span class="pill ${on ? 'blue' : ''}">${on ? `${on} on` : 'all off'}</span><i class="sec-chev" aria-hidden="true">▾</i></button>
+        <div class="look-grid">${g.items.map((it) => {
+          const lv = st.levels[it.key] ?? 0, tag = LOOK_TAG[it.kind === 'built' ? 'built' : 'layer'];
+          return `<div class="look-card ${lv ? 'on' : ''}"><div class="ld">${lookDemo(it.key, st.gradeMood)}</div>
+            <div class="t"><span>${esc(it.title)}</span><span class="tagc ${tag[2]}" title="${tag[1]}">${tag[0]}</span></div>
+            <div class="d">${esc(it.desc)}</div>
+            <div class="seg">${LOOK_LV.map((l, n) => `<button type="button" class="${lv === n ? 'on' : ''}" data-look-key="${it.key}" data-look-level="${n}">${l}</button>`).join('')}</div>
+            <div class="lv">${lv ? esc(lv === 2 ? it.full : it.light) : 'Not used'}</div>
+            ${it.key === 'grade' && lv ? `<select data-look-mood>${spec.moods.map((m) => `<option ${m === st.gradeMood ? 'selected' : ''}>${m}</option>`).join('')}</select>` : ''}
+          </div>`;
+        }).join('')}</div></section>`;
+    }).join('')}</div>
     <div class="sticky-bar">
-      <div class="small muted">${built ? (changes.length ? `${changes.length} Claude-built change${changes.length === 1 ? '' : 's'} waiting. Instant options are already live.` : 'Instant options are live in the preview. Render to get motion blur and sound.') : 'Saved as you click. These choices are passed to Claude with your brief.'}</div>
+      <div class="small muted">${built ? (changes.length ? `${changes.length} Claude-built change${changes.length === 1 ? '' : 's'} waiting. “Live” options are already showing.` : '“Live” options are showing in the preview. Render to get motion blur and sound.') : 'Saved as you click. Next, Claude designs three concept looks using these choices.'}</div>
       <div class="row">
         ${built && changes.length ? `<button type="button" class="btn gold" data-action="apply-look" ${busy ? 'disabled' : ''}>Apply ${changes.length} change${changes.length === 1 ? '' : 's'} with Claude</button>` : ''}
         ${built ? '<button type="button" class="btn primary lg" data-tab="render">Preview &amp; render →</button>' : `<button type="button" class="btn primary lg" data-action="gen-concepts" ${busy ? 'disabled' : ''}>${S.cur.concepts ? 'Regenerate concepts' : 'Generate concepts'} →</button>`}
       </div>
     </div>`;
+  lookTick();
 };
 // same rule as the server: Claude-built options whose level differs from what was last applied
 const lookChangesLocal = (look) => {
@@ -732,18 +879,22 @@ const renderRender = () => {
   const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
   const pct = Math.round((j?.progress ?? 0) * 100);
   const outDir = S.state.settings?.outDir ?? '';
+  const fmt = outFmt(p.brief);
+  const locked = !p.approval; // rendering waits for the user's approval on Build & timing
   $('#tab').innerHTML = `
+    ${locked ? '<div class="render-lock"><div><b>Rendering is locked until you approve the build.</b><div class="small muted" style="margin-top:3px">Check every scene on Build &amp; timing, send any corrections to the AI, then approve. You can still watch the live preview here.</div></div><button type="button" class="btn primary" data-tab="build">Go to review →</button></div>' : ''}
     <div class="spread" style="margin-bottom:12px"><div class="row"><h2>Live preview</h2><span class="muted small">Remotion Studio · updates as Claude edits</span></div><a class="btn ghost sm" href="${studioUrl}" target="_blank" rel="noopener">Open full screen ↗</a></div>
     <div class="preview"><iframe src="${studioUrl}" title="Remotion preview"></iframe></div>
     <div class="card" style="margin-top:16px">
       <div class="spread">
-        <div><h2>Render</h2><div class="muted small">Draft = half resolution, quick check. Final = full quality H.264.</div></div>
+        <div><h2>Render</h2><div class="muted small">Draft = half resolution, quick check. Final = ${fmt === 'mp4' ? 'full quality H.264' : `full quality, converted to ${fmt.toUpperCase()}`}.</div></div>
         <div class="row">
-          <button class="btn" data-action="render" data-draft="1" ${j && !j.done ? 'disabled' : ''}>Draft render</button>
-          <button class="btn primary" data-action="render" ${j && !j.done ? 'disabled' : ''}>Final render (MP4)</button>
+          <button class="btn" data-action="render" data-draft="1" ${(j && !j.done) || locked ? 'disabled' : ''}>Draft render</button>
+          <button class="btn primary" data-action="render" ${(j && !j.done) || locked ? 'disabled' : ''}>Final render (${fmt.toUpperCase()})</button>
           ${j && !j.done ? '<button class="btn ghost danger" data-action="cancel-render">Cancel</button>' : ''}
         </div>
       </div>
+      <div class="render-out">${outputPicker(p.brief)}</div>
       <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
         <span class="small"><b>Output folder</b></span>
         <input id="out-dir" style="flex:1;min-width:220px" placeholder="Not set: renders stay inside the studio (use Download)" value="${esc(outDir)}" />
@@ -754,8 +905,8 @@ const renderRender = () => {
       ${j ? `<div style="margin-top:14px"><div class="spread small"><b>${j.stage === 'error' ? `Failed: ${esc(j.error)}` : j.done ? `Done${j.exported ? ` · saved to ${esc(j.exported)}` : ''}${j.exportError ? ` · copy to output folder failed: ${esc(j.exportError)}` : ''}` : `${esc(j.stage)}${j.frames ? ` · frame ${j.frames}/${j.total}` : ''}`}</b><span>${pct}%</span></div><div class="bar" style="margin-top:6px"><i style="width:${pct}%"></i></div></div>` : ''}
     </div>
     ${p.renders.length ? `<div class="section-title"><h2>Renders</h2></div><div class="renders">${p.renders.map((r) => `
-      <div class="card" style="padding:12px"><video src="/data/${p.id}/${r.file}" controls preload="metadata"></video>
-        <div class="spread" style="margin-top:10px"><div class="small"><b>${r.draft ? 'Draft' : 'Final'}</b> · ${fmtT(r.durationSec)} · ${r.width}×${r.height}<div class="muted">${new Date(r.at).toLocaleString()}</div>${r.exported ? `<div class="muted" title="${esc(r.exported)}">Saved: ${esc(r.exported)}</div>` : ''}</div>
+      <div class="card" style="padding:12px">${r.format === 'gif' || r.format === 'webp' ? `<img class="anim-prev" src="/data/${p.id}/${r.file}" alt="" />` : `<video src="/data/${p.id}/${r.file}" controls preload="metadata"></video>`}
+        <div class="spread" style="margin-top:10px"><div class="small"><b>${r.draft ? 'Draft' : 'Final'}</b> <span class="pill">${esc((r.format ?? 'mp4').toUpperCase())}</span> · ${fmtT(r.durationSec)} · ${r.width}×${r.height}<div class="muted">${new Date(r.at).toLocaleString()}</div>${r.exported ? `<div class="muted" title="${esc(r.exported)}">Saved: ${esc(r.exported)}</div>` : ''}</div>
           <div class="row" style="gap:6px">${r.exported ? `<button class="btn sm ghost" data-action="open-folder" data-path="${esc(r.exported)}">Show</button>` : outDir ? `<button class="btn sm ghost" data-action="export-render" data-file="${esc(r.file)}">Save to folder</button>` : ''}<a class="btn sm" href="/data/${p.id}/${r.file}" download>Download</a></div></div></div>`).join('')}</div>` : ''}
     <div class="card" style="margin-top:18px">
       <h3>Reuse this look</h3>
@@ -790,9 +941,19 @@ const renderChat = () => {
   el.innerHTML = items.join('') || `<div class="chat-empty">This is where Claude reports what it's doing. You can also type here at any time: ask questions, give feedback on concepts, or request changes to the built video.</div>`;
   if (atBottom || renderChat.first !== S.cur.project.id) el.scrollTop = el.scrollHeight;
   renderChat.first = S.cur.project.id;
-  $('#chat-head-name').textContent = aiName();
+  const rt = aiRuntime(), chip = aiChip();
+  $('#chat-head-name').title = chip ? chip.title : '';
+  $('#chat-head-name').textContent = aiTag() ?? aiName();
+  const meta = $('#chat-meta'), lt = S.cur.project.lastTurn;
+  meta.hidden = !rt;
+  if (rt) {
+    const big = (lt?.context ?? 0) > 120000;
+    meta.innerHTML = `<span class="where ${esc(rt.where)}" title="${esc(chip.title)}">${rt.where === 'cloud' ? '☁ model on' : '⌂ model on'} ${esc(rt.host)}</span><span class="where pc" title="Files, commands and renders run on this computer">⌂ tools on ${esc(rt.tools)}</span>
+      ${lt?.context ? `<span class="ctx ${big ? 'big' : ''}" title="Every request re-reads the whole conversation, so a long one costs more each time.">conversation ≈ ${kTok(lt.context)} tokens</span><button type="button" class="btn ghost sm" data-action="fresh-session" ${S.cur.busy ? 'disabled' : ''} title="Forget the chat history (not your video files). The next request starts small and costs less.">Fresh start</button>` : ''}`;
+  }
   $('#agent-state').innerHTML = S.cur.busy ? '<i class="dot"></i> working' : 'idle';
   $('#stop-btn').hidden = !S.cur.busy;
+  syncHeadStop();
 };
 
 // ---------- events from the server ----------
@@ -802,16 +963,20 @@ const refresh = (full = true) => {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(async () => {
     await loadState().catch(() => {});
-    if (!S.cur) { if (!route().id) renderHome(); return; }
+    if (!S.cur) { if (!route().id && !route().tools) renderHome(); return; }
     await loadProject(S.cur.project.id).catch(() => {});
     if (!full) return renderChat();
-    const editing = (S.tab === 'brief' && document.activeElement?.closest?.('#brief')) || (S.tab === 'text' && S.textDirty) || (S.tab === 'audio' && S.audioDirty) || (S.tab === 'background' && document.activeElement?.closest?.('#bgform')) || (S.tab === 'style' && document.activeElement?.closest?.('#style-request, #styleform'));
+    const editing = (S.tab === 'brief' && document.activeElement?.closest?.('#brief')) || (S.tab === 'text' && S.textDirty) || (S.tab === 'audio' && S.audioDirty) || (S.tab === 'background' && document.activeElement?.closest?.('#bgform')) || (S.tab === 'style' && document.activeElement?.closest?.('#style-request, #styleform')) || (S.tab === 'build' && reviewEditing());
     if (editing) { renderAssets(); } else { renderProject(); }
     renderChat();
   }, 250);
 };
+es.onopen = () => setConnection(true);
+es.onerror = () => setConnection(false);
 es.onmessage = (m) => {
   const e = JSON.parse(m.data);
+  if (onServerEvent(e)) return; // activity lines + heartbeat feed the Activity dock only
+  if (e.type === 'tools') { if (route().tools) toolsChanged(); return; }
   if (e.type === 'projects') return refresh(false);
   if (e.type === 'planner') { if (S.cur?.project.id === e.projectId && S.plannerBusy) { S.plannerProgress = e; updatePlannerWait(); } return; }
   if (e.type === 'render') { S.renderJob = e; renderRenderPill(); if (S.cur?.project.id === e.projectId && S.tab === 'render') { if (e.done) refresh(); else renderRender(); } return; }
@@ -828,10 +993,41 @@ es.onmessage = (m) => {
   }
 };
 
+initTools({api, toast});
+initReview({S: () => S, api, toast, esc, fmtT, bust, liveBox, rerender: () => renderBuild(), reload: async () => { await loadProject(S.cur.project.id); renderProject(); renderChat(); }});
+
+// ---------- activity dock: what the page itself is doing ----------
+initActivity(() => ({projectId: S.cur?.project.id ?? route().id ?? null, aiName: S.state?.settings ? aiName() : 'The AI', aiTag: aiTag(), aiChip: aiChip(), projectTitle: (id) => S.state?.projects?.find((x) => x.id === id)?.title ?? id, prettyModel}));
+// a click is noted before it is handled, so "I pressed it and nothing happened" still leaves a trace (and the line after it says what came of it)
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button, [data-action], [data-tab], [data-look-bundle]');
+  if (!b || b.closest('#dock')) return;
+  const label = (b.textContent || b.getAttribute('title') || b.dataset.action || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (label) note(`Clicked “${label}”`);
+}, true);
+window.addEventListener('error', (e) => note(`Page error: ${e.message}${e.filename ? ` (${e.filename.split('/').pop()}:${e.lineno})` : ''}`, {level: 'error'}));
+window.addEventListener('unhandledrejection', (e) => note(`Page error: ${e.reason?.message ?? e.reason}`, {level: 'error'}));
+
+// ---------- lightbox (prev / next through the frames of the same group) ----------
+let lbGroup = [], lbIdx = 0;
+function lbShow() {
+  const el = lbGroup[lbIdx], lb = $('#lightbox');
+  $('img', lb).src = el.dataset.zoom; $('.lb-cap', lb).textContent = `${el.dataset.cap ?? ''}${lbGroup.length > 1 ? `  ·  ${lbIdx + 1} / ${lbGroup.length}` : ''}`;
+  lb.classList.toggle('single', lbGroup.length < 2); lb.hidden = false;
+}
+function lbOpen(el) { lbGroup = [...(el.parentElement?.querySelectorAll(':scope > [data-zoom]') ?? [el])]; lbIdx = Math.max(0, lbGroup.indexOf(el)); if (!lbGroup.length) lbGroup = [el]; lbShow(); }
+function lbStep(d) { if (lbGroup.length < 2) return; lbIdx = (lbIdx + d + lbGroup.length) % lbGroup.length; lbShow(); }
+document.addEventListener('keydown', (e) => {
+  if ($('#lightbox').hidden) return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); lbStep(1); } else if (e.key === 'ArrowLeft') { e.preventDefault(); lbStep(-1); } else if (e.key === 'Escape') $('#lightbox').hidden = true;
+});
+
 // ---------- actions ----------
 document.addEventListener('click', async (ev) => {
   const zoom = ev.target.closest('[data-zoom]');
-  if (zoom) { const lb = $('#lightbox'); $('img', lb).src = zoom.dataset.zoom; $('.lb-cap', lb).textContent = zoom.dataset.cap ?? ''; lb.hidden = false; return; }
+  if (zoom) { lbOpen(zoom); return; }
+  const lbNav = ev.target.closest('[data-lb]');
+  if (lbNav) { lbStep(lbNav.dataset.lb === 'next' ? 1 : -1); return; }
   if (ev.target.closest('#lightbox')) { $('#lightbox').hidden = true; return; }
   const tabBtn = ev.target.closest('[data-tab]');
   if (tabBtn && !tabBtn.disabled) { await flushSave(); S.tab = tabBtn.dataset.tab; go(S.cur.project.id, S.tab); return; }
@@ -839,6 +1035,28 @@ document.addEventListener('click', async (ev) => {
   if (lk) { const st = lookState(); st.levels[lk.dataset.lookKey] = Number(lk.dataset.lookLevel); st.bundle = ''; try { await saveLook(st); } catch (e) { toast(e.message); } return; }
   const lb = ev.target.closest('[data-look-bundle]');
   if (lb) { try { await saveLook({bundle: lb.dataset.lookBundle, levels: null}); } catch (e) { toast(e.message); } return; }
+  const outBtn = ev.target.closest('[data-outfmt], [data-animw], [data-animfps]');
+  if (outBtn) {
+    if (outBtn.dataset.outfmt) setBrief('outputFormat', outBtn.dataset.outfmt);
+    if (outBtn.dataset.animw) setBrief('animWidth', Number(outBtn.dataset.animw));
+    if (outBtn.dataset.animfps) setBrief('animFps', Number(outBtn.dataset.animfps));
+    if (S.tab === 'render') renderRender(); else renderBrief();
+    return;
+  }
+  const fpsBtn = ev.target.closest('[data-fps]');
+  if (fpsBtn) { setBrief('fps', Number(fpsBtn.dataset.fps)); renderBrief(); return; }
+  const durBtn = ev.target.closest('[data-dur]');
+  if (durBtn) { setBrief('durationSec', durBtn.dataset.dur === '' ? null : Number(durBtn.dataset.dur)); renderBrief(); return; }
+  const capBtn = ev.target.closest('[data-caption]');
+  if (capBtn) { setBrief('captions', capBtn.dataset.caption); renderBrief(); return; }
+  const moodBtn = ev.target.closest('[data-mood]');
+  if (moodBtn) {
+    const list = moodList(S.cur.project.brief.style), m = moodBtn.dataset.mood, i = list.findIndex((x) => x.toLowerCase() === m.toLowerCase());
+    if (i >= 0) list.splice(i, 1); else list.push(m.toLowerCase());
+    const val = list.join(', '); setBrief('style', val);
+    const input = document.querySelector('#brief [name="style"]'); if (input) input.value = val;
+    moodBtn.classList.toggle('on', i < 0); return;
+  }
   const sizeBtn = ev.target.closest('[data-size]');
   if (sizeBtn) { const [w, h] = sizeBtn.dataset.size.split('x').map(Number); setBrief('width', w); setBrief('height', h); renderBrief(); return; }
   const a = ev.target.closest('[data-action]');
@@ -857,6 +1075,35 @@ document.addEventListener('click', async (ev) => {
         applyPanelState();
         break;
       case 'home': go(null); break;
+      case 'lg-fold': { const sec = a.closest('.look-group'), off = !sec.classList.contains('folded'); sec.classList.toggle('folded', off); a.setAttribute('aria-expanded', String(!off)); try { localStorage.setItem(`studio-lg-${sec.dataset.lg}`, off ? '1' : '0'); } catch { /* ignore */ } break; }
+      case 'look-reset': await saveLook({bundle: 'none', levels: null}); S.lookAI = null; renderLook(); toast('Everything is off. Pick a style or switch on what you like.'); break;
+      case 'look-suggest': {
+        if (S.lookAI?.busy) break;
+        await flushSave();
+        const ctrl = new AbortController();
+        S.lookAI = {busy: true, startedAt: Date.now(), ctrl};
+        clearInterval(S.lookTimer); S.lookTimer = setInterval(lookTick, 1000);
+        renderLook(); syncHeadStop();
+        try {
+          const r = await api(`/api/projects/${id}/look/suggest`, {method: 'POST', body: {}, signal: ctrl.signal});
+          await saveLook({levels: r.levels, gradeMood: r.gradeMood, bundle: ''});
+          S.lookAI = {reason: r.reason, usage: r.usage};
+          toast('The AI chose the look. Change anything you like.');
+        } catch (e) {
+          S.lookAI = ctrl.signal.aborted ? null : {error: e.message};
+          toast(ctrl.signal.aborted ? 'Stopped.' : e.message);
+        } finally { clearInterval(S.lookTimer); if (S.tab === 'look' && S.cur?.project.id === id) renderLook(); syncHeadStop(); }
+        break;
+      }
+      case 'bsec-fold': { const sec = a.closest('.bsec'), off = !sec.classList.contains('folded'); sec.classList.toggle('folded', off); a.setAttribute('aria-expanded', String(!off)); try { localStorage.setItem(`studio-bsec-${sec.dataset.bsec}`, off ? '1' : '0'); } catch { /* ignore */ } break; }
+      case 'bsec-go': { const sec = document.getElementById(`bsec-${a.dataset.key}`); if (sec) { sec.classList.remove('folded'); sec.querySelector('.bsec-head')?.setAttribute('aria-expanded', 'true'); try { localStorage.setItem(`studio-bsec-${a.dataset.key}`, '0'); } catch { /* ignore */ } sec.scrollIntoView({behavior: 'smooth', block: 'start'}); } break; }
+      case 'fold': { const sec = a.closest('.side-sec'), off = !sec.classList.contains('folded'); setFold(sec, off); try { localStorage.setItem(foldKey(sec.dataset.sec), off ? '1' : '0'); } catch { /* ignore */ } break; }
+      case 'fresh-session':
+        if (!confirm('Start a fresh AI conversation for this video?\n\nThe AI forgets the chat so far (your video files are untouched) and the next request costs less. It will re-read the brief and the code it needs.')) break;
+        await api(`/api/projects/${id}/fresh-session`, {method: 'POST'}); await loadProject(id); renderChat(); toast('Fresh conversation started. The next request starts small.');
+        break;
+      case 'side-more': S.sideLimit += 8; renderSide(); break;
+      case 'side-less': S.sideLimit = 8; renderSide(); break;
       case 'save-ai': {
         const v = (n) => $(`#ai-form [name="${n}"]`)?.value ?? '';
         S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {model: v('ai-model'), baseUrl: v('ai-baseUrl'), apiKey: v('ai-apiKey')}}});
@@ -916,6 +1163,17 @@ document.addEventListener('click', async (ev) => {
         if (confirm(`Delete "${S.cur.project.title}" with its code, uploads and renders?`)) { await api(`/api/projects/${id}`, {method: 'DELETE'}); go(null); }
         break;
       case 'stop': await api(`/api/projects/${id}/stop`, {method: 'POST'}); break;
+      case 'stop-all': {
+        a.disabled = true;
+        const jobs = [];
+        if (storyRunning()) stopStoryRun();
+        if (S.lookAI?.busy) S.lookAI.ctrl?.abort();
+        if (S.cur.busy) jobs.push(api(`/api/projects/${id}/stop`, {method: 'POST'}));
+        if (S.plannerBusy) { S.plannerAborting = true; updatePlannerWait(); jobs.push(api(`/api/projects/${id}/script-plan/cancel`, {method: 'POST'})); }
+        if (S.renderJob && !S.renderJob.done && S.renderJob.projectId === id) jobs.push(api('/api/render/cancel', {method: 'POST'}));
+        try { await Promise.all(jobs); toast('Stop requested. It can take a few seconds to wind down.'); } catch (e) { a.disabled = false; toast(e.message); }
+        break;
+      }
       case 'add-color': { const c = [...S.cur.project.brief.colors, '#1582D5']; setBrief('colors', c); renderBrief(); break; }
       case 'rm-color': { const c = S.cur.project.brief.colors.filter((_, i) => i !== Number(a.dataset.i)); setBrief('colors', c); renderBrief(); break; }
       case 'brand-palette': {
@@ -1034,7 +1292,7 @@ document.addEventListener('input', (ev) => {
     return;
   }
   if (!t.closest('#brief') || !t.name) return;
-  if (t.name === 'title') { S.cur.project.title = t.value; queueSave({title: t.value}); return; }
+  if (t.name === 'title') { S.cur.project.title = t.value; queueSave({title: t.value}); updateRail(); return; }
   if (t.name === 'presetId') return;
   const num = ['width', 'height', 'fps', 'durationSec'].includes(t.name);
   setBrief(t.name, num ? (t.value === '' ? null : Number(t.value)) : t.value);
@@ -1056,6 +1314,7 @@ document.addEventListener('change', async (ev) => {
     }
     if (t.dataset.role) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.role)}`, {method: 'PATCH', body: {role: t.value}}); return; }
     if (t.dataset.note != null) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.note)}`, {method: 'PATCH', body: {note: t.value}}); return; }
+    if (t.name === 'claude-model') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {model: t.value}}}); S.aiOpen = true; renderHome(); toast(t.value ? `Video Studio will use ${t.value}.` : 'Video Studio will use the Claude Code default model.'); return; }
     if (t.name === 'ai-provider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); S.aiOpen = true; renderHome(); return; }
     if (t.name === 'plannerProvider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); renderProject(); return; }
     if (t.name?.startsWith('planner')) { setBrief(t.name, t.value); return; }

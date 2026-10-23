@@ -1,0 +1,45 @@
+/* Build & timing as a review: scene cards with frames, correction boxes, add-scene slots, approval bar */
+.rv-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.rv-step { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid #e3e8f2; border-radius: 12px; background: #fbfcfe; }
+.rv-step i { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 12px; background: #eef1f6; color: var(--slate); }
+.rv-step b { display: block; font-size: 13px; }
+.rv-step small { display: block; font-size: 11.5px; color: var(--muted); }
+.rv-step.on { border-color: #b9cffb; background: #f1f6ff; }
+.rv-step.on i { background: #3975ed; color: #fff; }
+.rv-step.done i { background: #e5f6ee; color: var(--green); }
+.rv-lead { margin: 0 0 12px; line-height: 1.6; color: var(--slate); }
+@media (max-width: 900px) { .rv-steps { grid-template-columns: 1fr 1fr; } }
+
+.scenes { margin-top: 14px; }
+.scene { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; padding: 16px; background: #fff; border: 1px solid #e3e8f2; border-radius: 16px; box-shadow: var(--shadow); }
+.scenes.portrait .scene { grid-template-columns: 170px minmax(0, 1fr); }
+.scene.has-note { border-color: #f0c75b; box-shadow: 0 0 0 3px rgba(255, 209, 102, .18), var(--shadow); }
+.scene .flag { display: none; }
+.scene.has-note .flag { display: inline-flex; }
+.scene-img { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.scene-img .shot { border-radius: 12px; border: 1px solid #e3e8f2; }
+.scene-img .shot img { max-height: 360px; object-fit: contain; background: #eef2f9; }
+.noframe { aspect-ratio: 16 / 9; display: grid; place-items: center; text-align: center; padding: 10px; font-size: 12px; color: var(--muted); border: 1px dashed #cfd8ea; border-radius: 12px; background: #fbfcfe; }
+.scene-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.scene-head .num { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #0f1d3d; color: #ffd166; font-weight: 800; flex: none; }
+.scene-head h3 { font-size: 17px; }
+.scene-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px 18px; margin-bottom: 12px; }
+.scene-info small { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 2px; }
+.scene-info p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink); }
+.scene .f em.inl { font-style: normal; font-weight: 400; color: var(--muted); }
+.scene textarea { border-color: #d3dcee; }
+.scene.has-note textarea { border-color: #f0c75b; background: #fffdf5; }
+@media (max-width: 900px) { .scene, .scenes.portrait .scene { grid-template-columns: 1fr; } }
+
+.slot { padding: 2px 0; }
+.slot-line { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+.slot-line::before, .slot-line::after { content: ''; flex: 1; border-top: 1px dashed #cfd8ea; }
+.slot-btn { border: 1px dashed #aec5fa; background: #f7faff; color: var(--deep); border-radius: 99px; padding: 5px 16px; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.slot-btn:hover { background: #e8f0ff; border-style: solid; }
+.addform, .addcard { margin: 8px 0 12px; padding: 14px 16px; border: 1px dashed #e0b84d; border-radius: 14px; background: #fffaf0; display: grid; gap: 10px; }
+.addform textarea, .addcard textarea { background: #fff; }
+.rv-hist summary { cursor: pointer; }
+.rv-h { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef1f6; }
+.rv-h ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; font-size: 13px; }
+.render-lock { display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; padding: 14px 18px; border: 1px solid #f0d58a; background: #fff8e6; border-radius: 14px; }
+.render-lock b { color: #7a5200; }

@@ -1,0 +1,53 @@
+{
+  "fps": 24,
+  "composition": "Studio-tutorial-animated-screens-2-concepts",
+  "analysis": [
+    "The tutorial demonstrates three actions: create an R2 bucket, make a bucket-scoped API token, then enter the bucket and credentials in MagicBolt AI. The uploaded reference is a long screen-recording tutorial; its sampled frames show those steps and the existing MagicBolt integration panel. Rebuild all screens as clean animated mock UI.",
+    "No voiceover transcript was supplied. The reference soundtrack could not be transcribed because the transcription utility writes temporary files under the studio directory, outside this workspace's write permission. Use sentence-based pacing after the narration is added.",
+    "The reference frames include real account content. The concepts use only the supplied demo bucket and mock credentials, with a placeholder endpoint. Official guidance: https://developers.cloudflare.com/r2/get-started/s3/ and https://developers.cloudflare.com/r2/api/tokens/ ."
+  ],
+  "concepts": [
+    {
+      "id": "a",
+      "name": "Glass Console Walkthrough",
+      "idea": "A bright, polished browser mockup guides viewers through the familiar Cloudflare and MagicBolt setup screens, one clear action at a time.",
+      "palette": ["#0E1B4D", "#1354BC", "#1582D5", "#FDC60B", "#F7941D", "#F6F8FE"],
+      "fonts": "Poppins Bold for headings and Poppins Regular for interface labels; JetBrains Mono for credential fields.",
+      "motion": "Soft glass panels rise into place; a cursor selects controls, bucket text types in, credentials copy across in a glossy chip, and a green connection toast lands. Fast, guided cuts with gentle background drift.",
+      "outline": [
+        {"scene": "Title Card", "sec": 5.5, "what": "Logo build and title: Cloudflare R2 Setup."},
+        {"scene": "Create Bucket", "sec": 11.0, "what": "Open R2 and create the magic-assets bucket."},
+        {"scene": "Scoped Token", "sec": 12.0, "what": "Choose bucket-only Object Read & Write and reveal mock credentials."},
+        {"scene": "Connect MagicBolt", "sec": 10.0, "what": "Type the demo bucket, key, secret, and placeholder endpoint; confirm success."},
+        {"scene": "End Logo", "sec": 10.04, "what": "Play the existing logo animation in full."}
+      ],
+      "samples": [
+        {"t": 2.15, "label": "R2 dashboard"},
+        {"t": 5.15, "label": "Create magic-assets"},
+        {"t": 8.15, "label": "Scoped credentials"},
+        {"t": 11.15, "label": "Connect MagicBolt"}
+      ]
+    },
+    {
+      "id": "b",
+      "name": "Cloud-to-Bolt Bridge",
+      "idea": "A cinematic deep-navy stage turns bucket creation and secure credential handoff into a glowing visual bridge between Cloudflare R2 and MagicBolt AI.",
+      "palette": ["#0E1B4D", "#1354BC", "#1582D5", "#FDC60B", "#F7941D", "#5A6488"],
+      "fonts": "Poppins Bold for large step titles and Poppins Regular for supporting labels; JetBrains Mono for mock access values.",
+      "motion": "Glossy cloud and bolt emblems anchor the mock panels. A dashed light path and floating credential chip travel between them; controls illuminate in sequence and resolve into a bright connected state.",
+      "outline": [
+        {"scene": "Title Card", "sec": 5.5, "what": "Logo build over a dark brand stage; introduce the R2-to-MagicBolt connection."},
+        {"scene": "Create Bucket", "sec": 11.0, "what": "A Cloudflare R2 panel types magic-assets and confirms bucket creation."},
+        {"scene": "Scope and Copy", "sec": 12.0, "what": "Show bucket-only read/write scope and fly mock credentials across the bridge."},
+        {"scene": "Connect", "sec": 10.0, "what": "Complete the MagicBolt mock form and illuminate the successful connection."},
+        {"scene": "End Logo", "sec": 10.04, "what": "Play the existing logo animation in full."}
+      ],
+      "samples": [
+        {"t": 2.15, "label": "Three-step bridge"},
+        {"t": 5.15, "label": "Create the bucket"},
+        {"t": 8.15, "label": "Credential handoff"},
+        {"t": 11.15, "label": "Connected"}
+      ]
+    }
+  ]
+}

@@ -197,6 +197,10 @@ table.sb td.tm { white-space: nowrap; font-variant-numeric: tabular-nums; color:
 .lightbox { position: fixed; inset: 0; background: rgba(8,12,30,.88); display: grid; place-items: center; z-index: 50; cursor: zoom-out; padding: 30px; }
 .lightbox img { max-width: 96vw; max-height: 88vh; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
 .lb-cap { color: #fff; margin-top: 10px; text-align: center; }
+.lb-nav { position: fixed; top: 50%; transform: translateY(-50%); width: 52px; height: 52px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 34px; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0 0 4px; }
+.lb-nav:hover { background: rgba(255,255,255,.34); }
+.lb-nav.prev { left: 22px; } .lb-nav.next { right: 22px; }
+.lightbox.single .lb-nav { display: none; }
 .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--navy); color: #fff; padding: 11px 18px; border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.25); z-index: 60; font-size: 13px; }
 
 @media (max-width: 1200px) { .chat { width: 320px; } .g4 { grid-template-columns: repeat(2, 1fr); } }
@@ -222,3 +226,7 @@ table.sb td.tm { white-space: nowrap; font-variant-numeric: tabular-nums; color:
 input[type=range] { padding: 0; border: 0; background: transparent; accent-color: var(--blue); }
 label.f > span b { float: right; color: var(--navy); }
 .aud-player { height: 34px; flex: 1; min-width: 200px; }
+
+.btn.stop-all { background: #E5484D; border-color: #E5484D; color: #fff; }
+.btn.stop-all:hover { background: #cf3a3f; }
+.btn.stop-all[hidden] { display: none; }

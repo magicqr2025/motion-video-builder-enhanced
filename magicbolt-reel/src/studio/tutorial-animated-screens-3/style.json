@@ -1,0 +1,5 @@
+{
+  "colors": {"NAVY":"#0E1B4D", "DEEP":"#1354BC", "BLUE":"#1582D5", "GOLD":"#FDC60B", "ORANGE":"#F7941D", "SLATE":"#5A6488"},
+  "_defaults": {"NAVY":"#0E1B4D", "DEEP":"#1354BC", "BLUE":"#1582D5", "GOLD":"#FDC60B", "ORANGE":"#F7941D", "SLATE":"#5A6488"},
+  "_labels": {"NAVY":"Dark backgrounds and headlines", "DEEP":"Primary buttons and gradients", "BLUE":"Highlights and active steps", "GOLD":"Key accents", "ORANGE":"Warm accents", "SLATE":"Supporting text"}
+}

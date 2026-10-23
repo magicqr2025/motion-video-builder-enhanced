@@ -1,0 +1,4 @@
+{
+  "voiceover": {"src": null, "volume": 1, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": null},
+  "music": {"src": null, "volume": 0.25, "loop": true, "fadeInSec": 1, "fadeOutSec": 2, "duck": true, "duckLevel": 0.35, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": null, "muted": false}
+}

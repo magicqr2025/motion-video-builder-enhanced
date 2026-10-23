@@ -76,7 +76,7 @@ export const renderStills = async (specs, {onProgress, serveUrl} = {}) => {
       try {
         const composition = await selectComposition({serveUrl, id: s.composition, inputProps, puppeteerInstance: browser, chromiumOptions: CHROMIUM});
         const frame = Math.max(0, Math.min(composition.durationInFrames - 1, Math.round(s.frame ?? 0)));
-        await renderStill({serveUrl, composition, output: s.out, frame, inputProps, imageFormat: 'png', puppeteerInstance: browser, chromiumOptions: CHROMIUM, overwrite: true});
+        await renderStill({serveUrl, composition, output: s.out, frame, inputProps, imageFormat: 'png', scale: s.scale ?? 1, puppeteerInstance: browser, chromiumOptions: CHROMIUM, overwrite: true});
         done.push({...s, ok: true});
       } catch (e) {
         done.push({...s, ok: false, error: String(e.message ?? e).split('\n')[0]});

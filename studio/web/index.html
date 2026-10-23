@@ -10,6 +10,11 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="look.css" />
   <link rel="stylesheet" href="theme.css" />
+  <link rel="stylesheet" href="activity.css" />
+  <link rel="stylesheet" href="tools.css" />
+  <link rel="stylesheet" href="review.css" />
+  <link rel="stylesheet" href="menu.css" />
+  <link rel="stylesheet" href="brief.css" />
 </head>
 <body>
   <header class="top">
@@ -17,34 +22,68 @@
       <span class="bolt"><svg viewBox="0 0 64 64"><path d="M36 6 14 36h14l-4 22 22-30H32z" /></svg></span>
       <span>Video Studio</span>
     </a>
+    <nav class="top-nav" aria-label="Main">
+      <button class="btn primary sm" data-action="home">＋ New video</button>
+      <a class="top-link" id="tools-link" href="#/tools" title="Video → script &amp; MP3"><span aria-hidden="true">♪</span> Video tools</a>
+    </nav>
     <div class="top-mid" id="crumbs"></div>
-    <div class="top-right">
-      <button class="btn ghost sm panel-toggle" id="toggle-left" data-action="toggle-left" type="button" aria-controls="projects-sidebar" aria-expanded="true">Hide projects</button>
-      <button class="btn ghost sm panel-toggle" id="toggle-right" data-action="toggle-right" type="button" aria-controls="chat" aria-expanded="true">Hide chat</button>
-      <span class="pill" id="render-pill" hidden></span>
-      <a class="btn ghost sm" id="open-remotion" target="_blank" rel="noopener">Remotion Studio ↗</a>
-    </div>
+    <div class="top-right"><span class="pill" id="render-pill" hidden></span></div>
   </header>
   <div class="layout">
     <aside class="side" id="projects-sidebar">
-      <button class="btn primary block" data-action="home">＋ New video</button>
-      <div class="side-label">Projects</div>
-      <nav id="projects"></nav>
+      <div class="panel-head"><span>Menu</span><button type="button" class="panel-x" data-action="toggle-left" title="Collapse the menu" aria-label="Collapse the menu">«</button></div>
+      <section class="side-sec" data-sec="projects">
+        <button type="button" class="sec-head" data-action="fold" aria-expanded="true"><span>Projects</span><i class="sec-chev" aria-hidden="true">▾</i></button>
+        <div class="sec-body"><nav id="projects"></nav></div>
+      </section>
+      <section class="side-sec" data-sec="shortcuts">
+        <button type="button" class="sec-head" data-action="fold" aria-expanded="true"><span>Shortcuts</span><i class="sec-chev" aria-hidden="true">▾</i></button>
+        <div class="sec-body">
+          <a class="nav-item" id="open-remotion" target="_blank" rel="noopener"><span class="ni-ic">▶</span><span class="ni-tx"><b>Remotion Studio</b><small>Live preview ↗</small></span></a>
+          <button type="button" class="nav-item" data-action="toggle-dock"><span class="ni-ic">≣</span><span class="ni-tx"><b>Activity</b><small id="ni-dock">Show or hide the panel</small></span></button>
+          <button type="button" class="nav-item" id="ni-chat" data-action="toggle-right"><span class="ni-ic">✎</span><span class="ni-tx"><b>Chat with Claude</b><small>Show or hide the chat</small></span></button>
+        </div>
+      </section>
     </aside>
+    <button type="button" class="edge-tab edge-left" data-action="toggle-left" title="Show the menu" aria-label="Show the menu">»</button>
     <main id="main"></main>
     <section class="chat" id="chat" hidden>
       <div class="chat-head">
         <div><b id="chat-head-name">Claude</b> <span id="agent-state" class="muted">idle</span></div>
-        <button class="btn ghost sm" id="stop-btn" data-action="stop" hidden>■ Stop</button>
+        <div class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn ghost sm" id="stop-btn" data-action="stop" hidden>■ Stop</button><button type="button" class="panel-x" data-action="toggle-right" title="Hide the chat (bring it back with “Show chat” at the top)" aria-label="Hide chat panel">»</button></div>
       </div>
+      <div class="chat-meta" id="chat-meta" hidden></div>
       <div class="chat-log" id="chat-log"></div>
       <form class="chat-input" id="chat-form">
         <textarea id="chat-text" rows="3" placeholder="Tell the AI what to change… (Enter to send, Shift+Enter for a new line)"></textarea>
         <button class="btn primary" type="submit">Send</button>
       </form>
     </section>
+    <button type="button" class="edge-tab edge-right" data-action="toggle-right" title="Show the chat" aria-label="Show the chat">«</button>
   </div>
-  <div class="lightbox" id="lightbox" hidden><img alt="" /><div class="lb-cap"></div></div>
+  <footer class="dock" id="dock" data-tone="idle" aria-label="Studio activity">
+    <div class="dock-bar" id="dock-bar" role="button" tabindex="0" aria-expanded="true" aria-controls="dock-body" title="Open or close the Activity panel">
+      <i class="dock-dot"></i>
+      <span class="dock-state" id="dock-state">Connecting to the studio…</span>
+      <span class="dock-ai" id="dock-ai" hidden></span>
+      <span class="dock-today" id="dock-today"></span>
+      <span class="dock-signal" id="dock-signal"></span>
+      <button type="button" class="dock-size" id="dock-size" title="Make the panel taller or shorter">⤢ Taller</button>
+      <span class="dock-chev" aria-hidden="true">▾</span>
+    </div>
+    <div class="dock-body" id="dock-body">
+      <div class="dock-top">
+        <div class="dock-tabs" role="tablist">
+          <button type="button" role="tab" data-dock-tab="live">Live</button>
+          <button type="button" role="tab" data-dock-tab="procs">Processes <b id="dock-pc"></b></button>
+          <button type="button" role="tab" data-dock-tab="log">Log</button>
+        </div>
+        <div class="dock-scope" title="Show only the open video, or everything"><button type="button" data-dock-scope="project">This video</button><button type="button" data-dock-scope="all">Everything</button></div>
+      </div>
+      <div class="dock-pane" id="dock-pane"></div>
+    </div>
+  </footer>
+  <div class="lightbox" id="lightbox" hidden><button class="lb-nav prev" data-lb="prev" title="Previous (←)" aria-label="Previous">‹</button><img alt="" /><div class="lb-cap"></div><button class="lb-nav next" data-lb="next" title="Next (→)" aria-label="Next">›</button></div>
   <div class="toast" id="toast" hidden></div>
   <script type="module" src="app.js"></script>
 </body>

@@ -1,0 +1,56 @@
+/* Video tools page: video -> script / MP3 */
+.side-link { display: flex; gap: 10px; align-items: center; margin-top: 10px; padding: 10px 12px; border: 1px solid #e3e8f1; border-radius: 12px; background: #fff; color: var(--ink); text-decoration: none; }
+.side-link:hover { background: #f2f5fa; }
+.side-link.on { background: #edf3ff; border-color: #dce7ff; color: #1d4bb5; }
+.side-link .sl-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: #edf3ff; color: var(--deep); font-weight: 700; }
+.side-link b { display: block; font-size: 12.5px; }
+.side-link small { display: block; font-size: 11px; color: var(--muted); }
+
+.tj { margin-top: 18px; }
+.tj-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.tj-head h3 { word-break: break-word; }
+.tj-body { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 20px; margin-top: 14px; align-items: start; }
+.tj-media video { width: 100%; max-height: 360px; border-radius: 12px; background: #000; display: block; }
+.tj-media audio { width: 100%; }
+.tj-panels { display: grid; gap: 14px; min-width: 0; }
+.tj-box { border: 1px solid var(--line); border-radius: 13px; padding: 14px 16px; background: #fbfcfe; }
+.tj-box > .spread { margin-bottom: 10px; }
+.tj-box h4 { margin: 0; font-size: 14px; font-weight: 700; }
+.tj-script { width: 100%; min-height: 200px; max-height: 420px; font-size: 13.5px; line-height: 1.7; background: #fff; }
+.tj-stamps { max-height: 420px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 11px; padding: 6px 12px; }
+.tj-stamps div { display: flex; gap: 12px; padding: 5px 0; border-bottom: 1px solid #f0f3f8; line-height: 1.55; font-size: 13.5px; }
+.tj-stamps div:last-child { border-bottom: 0; }
+.tj-stamps time { flex: none; width: 52px; color: var(--deep); font-variant-numeric: tabular-nums; font-weight: 600; font-size: 12px; padding-top: 1px; }
+.tj-note { font-size: 12.5px; color: var(--slate); line-height: 1.55; }
+.tj-note.err { color: var(--red); }
+.tj-note.warn { color: #9a6a05; }
+.tj-run { display: grid; gap: 6px; }
+.tj-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.tj-actions select { width: auto; padding: 6px 10px; font-size: 12px; }
+.tj-up { margin-top: 10px; }
+@media (max-width: 900px) { .tj-body { grid-template-columns: 1fr; } }
+
+/* compact project list in the left menu */
+#projects a { padding: 6px 10px; margin-bottom: 1px; border-radius: 9px; }
+#projects .t { font-size: 12px; line-height: 1.3; min-width: 0; }
+#projects .t span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#projects .t .dot { flex: none; }
+#projects .s { margin-top: 0; font-size: 10.5px; line-height: 1.3; }
+.side-label { margin: 18px 10px 6px; }
+.side-more { display: block; width: 100%; margin-top: 6px; padding: 7px 10px; border: 1px dashed #cfd8ea; border-radius: 9px; background: transparent; color: var(--deep); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; text-align: center; }
+.side-more:hover { background: #f2f6ff; border-color: #aec5fa; }
+.side-more small { font-weight: 400; color: var(--muted); }
+
+.tj-box > .spread { align-items: center; flex-wrap: wrap; gap: 8px; }
+.tj-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tj-meta .pill { font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.tj-head { align-items: center; flex-wrap: nowrap; }
+.tj-title { flex: 1; min-width: 0; }
+.tj-fold { flex: none; width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--deep); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.tj-fold:hover { background: #edf3ff; }
+.tj-fold i { font-style: normal; font-size: 15px; line-height: 1; transition: transform .18s ease; }
+.tj.collapsed .tj-fold i { transform: rotate(-90deg); }
+.tj.collapsed .tj-body { display: none; }
+.tj-head [data-tj-time]:empty { display: none; }
+.tj:not(.collapsed) .tj-head [data-tj-time] { display: none; }

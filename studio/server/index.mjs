@@ -8,12 +8,17 @@ import express from 'express';
 import multer from 'multer';
 import {DATA, WEB, REEL, projectDir, projectAssets, projectCode, compId, conceptsCompId} from './paths.mjs';
 import {listPresets, listBrands, getPreset, listProjects, getProject, saveProject, createProject, deleteProject, readConcepts, readStoryboard, listImages, readLog, appendLog} from './projects.mjs';
-import {runAgent, isBusy, stopAgent} from './agent.mjs';
-import {conceptsPrompt, buildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
+import {runAgent, isBusy, stopAgent, busyList} from './agent.mjs';
+import {bindActivity, activityLog, recentActivity, lastActivityAt, startProcess, endProcess, patchProcess, listProcesses, runningProcesses, processesCsv, readHistory, listDays} from './activity.mjs';
+import {conceptsPrompt, buildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, reviewPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
 import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, writeRegistry, STUDIO_PORT} from './remotion.mjs';
 import {transcribeFile} from './transcribe.mjs';
-import {readSettings, writeSettings, publicSettings, updateAi, aiConfig} from './settings.mjs';
+import {readSettings, writeSettings, publicSettings, updateAi, aiConfig, aiRuntime} from './settings.mjs';
 import {pingModel} from './providers/openai.mjs';
+import {mountTools} from './tools.mjs';
+import {emptyReview, cleanReview, pendingCount, reviewSummary, clearSent} from './review.mjs';
+import {mountStory, stopStory} from './story.mjs';
+import {convertAnimated, OUTPUT_FORMATS, ANIM_WIDTHS, ANIM_FPS} from './animate.mjs';
 import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges, lookChangePrompt} from './look.mjs';
 
 const PORT = Number(process.env.PORT ?? 4321);
@@ -23,7 +28,103 @@ app.use(express.json({limit: '2mb'}));
 // ---------- live events (server-sent) ----------
 const clients = new Set();
 const scriptPlanJobs = new Map();
-const broadcast = (e) => { const s = `data: ${JSON.stringify(e)}\n\n`; for (const res of clients) res.write(s); };
+const rawBroadcast = (e) => { const s = `data: ${JSON.stringify(e)}\n\n`; for (const res of clients) res.write(s); };
+bindActivity(rawBroadcast);
+
+// Every event the browser already gets is also written to the Activity feed in plain words.
+const clip = (s, n = 220) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? `${s.slice(0, n - 1)}…` : s; };
+const renderMark = {stage: null, bucket: -1};
+const describeEvent = (e) => {
+  const projectId = e.projectId ?? null;
+  if (e.type === 'agent') {
+    // 'where' says where that line happened: the model answers remotely (cloud) unless it is Ollama/localhost; the tools it calls run on this PC
+    const model = aiRuntime().where;
+    if (e.kind === 'user') return {projectId, source: 'ai', where: model, tool: 'task', text: `Task sent to ${aiRuntime().engine}: ${clip(e.text)}`};
+    if (e.kind === 'tool') return {projectId, source: 'ai', where: 'pc', tool: e.tool, text: clip(e.text)};
+    if (e.kind === 'text') return {projectId, source: 'ai', where: model, tool: 'reply', text: `Says: ${clip(e.text)}`};
+    if (e.kind === 'usage') return {projectId, source: 'ai', where: model, tool: 'tokens', text: e.text};
+    if (e.kind === 'error') return {projectId, source: 'ai', where: model, tool: 'error', level: 'error', text: clip(e.text)};
+    if (e.kind === 'done') return {projectId, source: 'ai', where: model, tool: 'done', level: e.ok ? 'ok' : 'error', text: e.ok ? 'Finished.' : 'Stopped or did not finish.'};
+    return null;
+  }
+  if (e.type === 'render') {
+    if (e.done) { renderMark.stage = null; return e.stage === 'error' ? {projectId, source: 'render', level: 'error', text: `Render failed: ${e.error}`} : {projectId, source: 'render', level: 'ok', text: `Render finished${e.exported ? `, saved to ${e.exported}` : ''}`}; }
+    if (renderMark.stage !== e.stage) { renderMark.stage = e.stage; renderMark.bucket = -1; return {projectId, source: 'render', text: `Render: ${e.stage}`}; }
+    const pct = Math.floor((e.progress ?? 0) * 10) * 10;
+    if (pct > renderMark.bucket) { renderMark.bucket = pct; return {projectId, source: 'render', text: `Render: ${e.stage} ${pct}%${e.frames ? ` (frame ${e.frames}/${e.total})` : ''}`}; }
+    return null;
+  }
+  if (e.type === 'job') return {projectId, source: e.file ? 'media' : 'job', level: /fail/i.test(e.text) ? 'error' : e.done ? 'ok' : 'info', text: clip(e.text)};
+  if (e.type === 'planner') return {projectId, source: 'script', level: e.stage === 'error' ? 'error' : e.stage === 'done' ? 'ok' : 'info', text: clip(e.message)};
+  return null;
+};
+const broadcast = (e) => { rawBroadcast(e); const a = describeEvent(e); if (a) activityLog(a.text, a); };
+
+// Every change the browser asks for is noted with the result, so a click that "did nothing" still leaves a trace.
+const ROUTES = [
+  ['POST', /^\/projects$/, 'Created a new video'],
+  ['PATCH', /^\/projects\/[^/]+$/, 'Saved changes to the video'],
+  ['DELETE', /^\/projects\/[^/]+$/, 'Deleted the video'],
+  ['POST', /\/assets$/, 'Uploaded file(s)'],
+  ['PATCH', /\/assets\//, 'Updated a file (role or note)'],
+  ['DELETE', /\/assets\//, 'Removed a file'],
+  ['DELETE', /\/reference-frames\//, 'Deleted a snapshot'],
+  ['POST', /\/script-plan$/, 'Script analysis'],
+  ['POST', /\/script-plan\/cancel$/, 'Cancelled script analysis'],
+  ['POST', /\/concepts$/, 'Asked the AI for concepts'],
+  ['POST', /\/approve$/, 'Approved a concept, build requested'],
+  ['POST', /\/message$/, 'Sent a message to the AI'],
+  ['POST', /\/stop$/, 'Asked the AI to stop'],
+  ['PUT', /\/review$/, 'Saved your review notes'],
+  ['POST', /\/review\/send$/, 'Sent your review to the AI'],
+  ['POST', /\/approve-build$/, 'Approved the build'],
+  ['DELETE', /\/approve-build$/, 'Withdrew the approval'],
+  ['POST', /\/scene-frame$/, 'Refreshing scene frames'],
+  ['POST', /\/fresh-session$/, 'Started a fresh AI conversation'],
+  ['POST', /\/save-preset$/, 'Asked the AI to save a preset'],
+  ['POST', /\/render$/, 'Render requested'],
+  ['POST', /^\/render\/cancel$/, 'Render cancel requested'],
+  ['PUT', /\/text$/, 'Saved the on-screen text'],
+  ['PUT', /\/audio$/, 'Saved the audio mix'],
+  ['PUT', /\/style$/, 'Saved the colours'],
+  ['PUT', /\/look$/, 'Saved Look & feel'],
+  ['POST', /\/look\/apply$/, 'Asked the AI to apply Look & feel changes'],
+  ['POST', /\/background$/, 'Asked the AI for background objects'],
+  ['PUT', /\/background-settings$/, 'Saved background controls'],
+  ['POST', /\/make-(text|audio|style)-editable$/, 'Making it editable'],
+  ['POST', /^\/tools\/jobs$/, 'Added a video to Video tools'],
+  ['POST', /^\/tools\/jobs\/[^/]+\/script$/, 'Script requested'],
+  ['POST', /^\/tools\/jobs\/[^/]+\/mp3$/, 'MP3 conversion requested'],
+  ['DELETE', /^\/tools\/jobs\//, 'Removed a video from Video tools'],
+  ['POST', /\/samples$/, 'Re-rendering concept stills'],
+  ['POST', /\/checks$/, 'Re-rendering check frames'],
+  ['POST', /\/renders\/export$/, 'Copied a render to the output folder'],
+  ['PUT', /^\/settings$/, 'Saved settings'],
+  ['POST', /\/test-ai$/, 'Tested the AI connection'],
+  ['POST', /\/pick-folder$/, 'Opened the folder picker'],
+  ['POST', /\/open-folder$/, 'Opened a folder'],
+];
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD') return next();
+  const t0 = Date.now(), url = req.originalUrl.replace(/^\/api/, '').split('?')[0];
+  res.on('finish', () => {
+    const label = ROUTES.find(([m, re]) => m === req.method && re.test(url))?.[2] ?? `${req.method} ${url}`;
+    const projectId = url.match(/^\/projects\/([^/]+)/)?.[1] ?? null;
+    const ms = Date.now() - t0;
+    if (res.statusCode >= 400) activityLog(`${label} failed: ${res.locals.err ?? res.statusCode}`, {projectId, source: 'system', level: 'error'});
+    else activityLog(`${label}${ms > 800 ? ` (${(ms / 1000).toFixed(1)}s)` : ''}`, {projectId, source: 'save'});
+  });
+  next();
+});
+
+app.get('/api/processes', (req, res) => res.json(listProcesses({project: String(req.query.project ?? '')})));
+app.get('/api/processes.csv', (req, res) => {
+  res.set({'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="video-studio-processes-${new Date().toLocaleDateString('en-CA')}.csv"`});
+  res.send(processesCsv());
+});
+app.get('/api/activity/days', (req, res) => res.json({days: listDays()}));
+app.get('/api/activity/history', (req, res) => res.json(readHistory({day: String(req.query.day ?? '').match(/^\d{4}-\d{2}-\d{2}$/)?.[0], project: String(req.query.project ?? ''), process: String(req.query.process ?? ''), q: String(req.query.q ?? '')})));
+app.get('/api/activity', (req, res) => res.json({now: Date.now(), entries: recentActivity(Number(req.query.since) || 0)}));
 app.get('/api/events', (req, res) => {
   res.set({'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive'});
   res.flushHeaders();
@@ -35,7 +136,7 @@ app.get('/api/events', (req, res) => {
 const changed = (id) => broadcast({type: 'project', projectId: id});
 
 // ---------- helpers ----------
-const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => res.status(e.status ?? 500).json({error: String(e.message ?? e)}));
+const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => { res.locals.err = String(e.message ?? e); res.status(e.status ?? 500).json({error: res.locals.err}); });
 const need = (id) => { const p = getProject(id); if (!p) throw Object.assign(new Error('No such project'), {status: 404}); return p; };
 const busyGuard = (id) => { if (isBusy(id)) throw Object.assign(new Error('Claude is still working on this project.'), {status: 409}); };
 const safeName = (s) => s.normalize('NFKD').replace(/[^\w.\- ]+/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').slice(-80) || `file-${Date.now()}`;
@@ -51,18 +152,29 @@ const referenceFrames = (p) => Object.fromEntries(p.assets.filter((a) => a.kind 
 let mediaQueue = Promise.resolve();
 const processAsset = (id, file) => { mediaQueue = mediaQueue.then(() => processAssetNow(id, file)).catch((e) => console.error(e)); };
 const patchAsset = (id, file, patch) => { const p = getProject(id); const a = p?.assets.find((x) => x.file === file); if (a) { Object.assign(a, patch); saveProject(p); changed(id); } return a; };
+let mediaNow = null; // what the media queue is doing right now, shown in the Activity heartbeat
 const processAssetNow = async (id, file) => {
   const p = getProject(id);
   const a = p?.assets.find((x) => x.file === file);
   if (!a) return;
   const src = path.join(projectAssets(id), file);
+  const note = (text, level = 'info') => activityLog(text, {projectId: id, source: 'media', level});
   if ((a.role === 'reference' || a.role === 'footage') && a.kind === 'video' && !a.refDir) {
     patchAsset(id, file, {job: 'extracting frames'});
+    mediaNow = {projectId: id, text: `Extracting frames from ${a.original}`, startedAt: Date.now()};
+    const fp = startProcess({kind: 'media', label: `Extract frames · ${a.original}`, projectId: id});
+    let failed = null;
+    note(`${mediaNow.text}…`);
     const refDir = `refs/${file.replace(/\.[^.]+$/, '')}`;
-    await extractReference(src, path.join(projectDir(id), refDir)).then(() => patchAsset(id, file, {refDir, job: null}), (e) => patchAsset(id, file, {job: null, jobError: String(e.message)}));
+    await extractReference(src, path.join(projectDir(id), refDir)).then((r) => { patchAsset(id, file, {refDir, job: null}); note(`Frames ready for ${a.original} (${r.frames.length} snapshots)`, 'ok'); }, (e) => { failed = e; patchAsset(id, file, {job: null, jobError: String(e.message)}); note(`Frame extraction failed for ${a.original}: ${clip(e.message, 160)}`, 'error'); });
+    endProcess(fp, {status: failed ? 'error' : 'done', error: failed?.message});
+    mediaNow = null;
   }
   if (a.role === 'voiceover' && (a.kind === 'audio' || a.kind === 'video') && !a.transcript) {
     patchAsset(id, file, {job: 'transcribing (first time downloads whisper)'});
+    mediaNow = {projectId: id, text: `Transcribing ${a.original} (the first run downloads the speech model, which can take a few minutes)`, startedAt: Date.now()};
+    const mp = startProcess({kind: 'media', label: `Transcribe · ${a.original}`, projectId: id});
+    note(`${mediaNow.text}…`);
     try {
       const lang = /hindi|hinglish/i.test(p.brief.language) ? 'hi' : /english/i.test(p.brief.language) ? 'en' : 'auto';
       const res = await transcribeFile(src, {language: lang, log: (m) => broadcast({type: 'job', projectId: id, file, text: m})});
@@ -70,9 +182,14 @@ const processAssetNow = async (id, file) => {
       fs.mkdirSync(path.join(projectDir(id), 'transcripts'), {recursive: true});
       fs.writeFileSync(path.join(projectDir(id), transcript), JSON.stringify(res, null, 1));
       patchAsset(id, file, {transcript, job: null, words: res.words.length});
+      note(`Transcribed ${a.original} (${res.words.length} words)`, 'ok');
+      endProcess(mp, {status: 'done'});
     } catch (e) {
       patchAsset(id, file, {job: null, jobError: `transcription failed: ${String(e.message).slice(0, 200)}`});
+      note(`Transcription failed for ${a.original}: ${clip(e.message, 160)}`, 'error');
+      endProcess(mp, {status: 'error', error: e.message});
     }
+    mediaNow = null;
   }
 };
 
@@ -112,6 +229,9 @@ app.delete('/api/projects/:id', wrap(async (req, res) => {
 
 // ---------- media ----------
 const upload = multer({dest: path.join(DATA, '_uploads'), limits: {fileSize: 4 * 1024 ** 3}});
+// Video tools tab: video -> script / MP3. Shares the one-at-a-time media queue because the speech engine cannot run twice at once.
+mountTools(app, {upload, wrap, broadcast, enqueue: (fn) => { mediaQueue = mediaQueue.then(fn).catch((e) => console.error(e)); }});
+mountStory(app, {wrap, need, changed, broadcast});
 app.post('/api/projects/:id/assets', upload.array('files', 30), wrap(async (req, res) => {
   const p = need(req.params.id);
   fs.mkdirSync(projectAssets(p.id), {recursive: true});
@@ -266,6 +386,7 @@ app.delete('/api/projects/:id/reference-frames/:file/:frame', wrap(async (req, r
 // ---------- agent phases ----------
 const startTurn = (p, prompt, label, {before, after} = {}) => {
   busyGuard(p.id);
+  if (p.approval && readStoryboard(p.id)) { p.approval = null; appendLog(p.id, {kind: 'system', text: 'The AI is changing the video, so the earlier approval was cleared. Approve again when you are happy.'}); }
   if (before) { Object.assign(p, before); saveProject(p); }
   if (p.briefDirty && !prompt.includes('### Brief')) prompt = `${briefChangedNote(p)}\n\n${prompt}`;
   if (p.textEdited) prompt = `${textEditedNote(p)}\n\n${prompt}`;
@@ -305,14 +426,97 @@ app.post('/api/projects/:id/message', wrap(async (req, res) => {
   const p = need(req.params.id);
   const text = String(req.body.text ?? '').trim();
   if (!text) return res.status(400).json({error: 'Empty message'});
-  const first = !p.sessionId;
-  startTurn(p, first ? `${briefChangedNote(p)}\n\nUser: ${text}` : revisePrompt(p, text), text, {
+  // a conversation already exists for this project (Claude, Codex or another model): do not re-send the whole brief
+  const first = !p.sessionId && !p.codexSessionId && !fs.existsSync(path.join(projectDir(p.id), 'agent-session.json'));
+  startTurn(p, first ? `${briefChangedNote(p)}\n\n${revisePrompt(p, text)}` : revisePrompt(p, text), text, {
     after: (q) => { if (q.status === 'building') q.status = readStoryboard(q.id) ? 'review' : q.status; if (q.status === 'brief' && readConcepts(q.id)?.concepts?.length) q.status = 'concepts'; },
   });
   res.json({ok: true});
 }));
 
-app.post('/api/projects/:id/stop', wrap(async (req, res) => { stopAgent(req.params.id); res.json({ok: true}); }));
+// Fresh start: every request re-reads the whole conversation, so a long one costs more each time. This drops the AI's memory
+// of the chat (not your project files) and the next request starts small; the brief is sent again with it.
+app.post('/api/projects/:id/fresh-session', wrap(async (req, res) => {
+  const p = need(req.params.id); busyGuard(p.id);
+  if (p.sessionId) p.sessionHistory = [...(p.sessionHistory ?? []), p.sessionId];
+  if (p.codexSessionId) p.codexSessionHistory = [...(p.codexSessionHistory ?? []), p.codexSessionId];
+  p.sessionId = null; p.codexSessionId = null;
+  const sf = path.join(projectDir(p.id), 'agent-session.json');
+  if (fs.existsSync(sf)) fs.renameSync(sf, path.join(projectDir(p.id), `agent-session.old-${Date.now()}.json`));
+  if (p.lastTurn) p.lastTurn.context = 0;
+  saveProject(p);
+  appendLog(p.id, {kind: 'system', text: 'Started a fresh AI conversation to save tokens. Your video files are untouched.'});
+  changed(p.id);
+  res.json({ok: true});
+}));
+
+// ---------- review: per-scene corrections, new scenes, approval ----------
+app.put('/api/projects/:id/review', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  p.review = cleanReview(req.body);
+  if (pendingCount(p.review) && p.approval) p.approval = null; // new corrections: the earlier approval no longer holds
+  saveProject(p);
+  res.json({review: p.review, approval: p.approval ?? null}); // no broadcast: autosave must not redraw the page under the user's cursor
+}));
+app.post('/api/projects/:id/review/send', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const sb = readStoryboard(p.id);
+  if (!sb) throw Object.assign(new Error('Nothing is built yet.'), {status: 400});
+  const rv = cleanReview(p.review);
+  if (!pendingCount(rv)) throw Object.assign(new Error('Write at least one correction or add a scene first.'), {status: 400});
+  startTurn(p, reviewPrompt(p, rv, sb), `Apply your review: ${reviewSummary(rv)}`, {
+    after: (q, ok) => {
+      if (!ok) return;
+      q.reviewHistory = [...(q.reviewHistory ?? []), {at: new Date().toISOString(), round: q.round ?? 0, review: rv}].slice(-30);
+      q.review = clearSent(q.review, rv);
+      q.round = (q.round ?? 0) + 1;
+    },
+  });
+  res.json({ok: true});
+}));
+app.post('/api/projects/:id/approve-build', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  busyGuard(p.id);
+  if (!readStoryboard(p.id)) throw Object.assign(new Error('Nothing is built yet.'), {status: 400});
+  if (pendingCount(cleanReview(p.review))) throw Object.assign(new Error('You still have corrections waiting. Send them to the AI first, or clear them.'), {status: 409});
+  p.approval = {at: new Date().toISOString(), round: p.round ?? 0};
+  saveProject(p);
+  appendLog(p.id, {kind: 'system', text: 'You approved the build. Rendering is now allowed.'});
+  changed(p.id); broadcast({type: 'projects'});
+  res.json({approval: p.approval});
+}));
+app.delete('/api/projects/:id/approve-build', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  p.approval = null; saveProject(p);
+  appendLog(p.id, {kind: 'system', text: 'You withdrew the approval.'});
+  changed(p.id);
+  res.json({ok: true});
+}));
+// one still per scene (middle of the scene), straight from the current code: no AI, so it costs no tokens
+app.post('/api/projects/:id/scene-frame', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  const sb = readStoryboard(p.id);
+  if (!sb?.scenes?.length) throw Object.assign(new Error('Nothing is built yet.'), {status: 400});
+  const fps = sb.fps ?? p.brief.fps ?? 30, only = req.body.n != null ? String(req.body.n) : null;
+  const dir = path.join(projectDir(p.id), 'checks');
+  const specs = sb.scenes.map((s, i) => ({s, key: String(s.n ?? i + 1)})).filter((x) => !only || x.key === only).map(({s, key}) => {
+    const t = Math.max(0, (Number(s.start) + Number(s.end)) / 2);
+    return {composition: compId(p.id), frame: Math.round(t * fps), out: path.join(dir, `scene-${key.padStart(2, '0')}-${t.toFixed(1)}s.png`), key};
+  });
+  if (!specs.length) throw Object.assign(new Error('No such scene.'), {status: 404});
+  res.json({ok: true, count: specs.length});
+  const sp = startProcess({kind: 'stills', source: 'job', label: `Scene frames (${specs.length}) · ${p.title}`, projectId: p.id});
+  broadcast({type: 'job', projectId: p.id, text: `Rendering ${specs.length} scene frame${specs.length === 1 ? '' : 's'}…`});
+  fs.mkdirSync(dir, {recursive: true});
+  for (const x of specs) for (const f of fs.readdirSync(dir)) if (f.startsWith(`scene-${x.key.padStart(2, '0')}-`)) fs.rmSync(path.join(dir, f), {force: true}); // this scene's older frame
+  const r = await renderStills(specs).catch((e) => [{ok: false, error: e.message}]);
+  const bad = r.filter((x) => !x.ok);
+  broadcast({type: 'job', projectId: p.id, text: bad.length ? `Scene frames: ${bad.length} failed (${bad[0].error})` : 'Scene frames updated', done: true});
+  endProcess(sp, {status: bad.length ? 'error' : 'done', error: bad[0]?.error});
+  changed(p.id);
+}));
+
+app.post('/api/projects/:id/stop', wrap(async (req, res) => { stopAgent(req.params.id); stopStory(req.params.id); res.json({ok: true}); }));
 
 app.post('/api/projects/:id/save-preset', wrap(async (req, res) => {
   const p = need(req.params.id);
@@ -545,10 +749,12 @@ app.post('/api/projects/:id/checks', wrap(async (req, res) => {
   }).filter(Boolean);
   if (!specs.length) return res.status(400).json({error: 'No check frames with a time in their name'});
   res.json({ok: true, count: specs.length});
+  const cp = startProcess({kind: 'stills', source: 'job', label: `Check frames (${specs.length}) · ${p.title}`, projectId: p.id});
   broadcast({type: 'job', projectId: p.id, text: `Re-rendering ${specs.length} check frames…`});
   const r = await renderStills(specs).catch((e) => [{ok: false, error: e.message}]);
   const bad = r.filter((x) => !x.ok);
   broadcast({type: 'job', projectId: p.id, text: bad.length ? `Check frames: ${bad.length} failed (${bad[0].error})` : 'Check frames updated', done: true});
+  endProcess(cp, {status: bad.length ? 'error' : 'done', error: bad[0]?.error});
 }));
 
 // re-render the concept stills without the agent
@@ -559,11 +765,13 @@ app.post('/api/projects/:id/samples', wrap(async (req, res) => {
   res.json({ok: true});
   const specs = [];
   for (const c of doc.concepts) (c.samples ?? []).forEach((s, i) => { s.file = `samples/${c.id}-${i + 1}.png`; specs.push({composition: s.composition ?? doc.composition ?? conceptsCompId(p.id), frame: s.frame ?? Math.round((s.t ?? 0) * (doc.fps ?? 30)), props: {concept: c.id, ...(s.props ?? {})}, out: path.join(projectDir(p.id), s.file)}); });
+  const sp = startProcess({kind: 'stills', source: 'job', label: `Concept stills · ${p.title}`, projectId: p.id});
   broadcast({type: 'job', projectId: p.id, text: 'Rendering samples…'});
   const r = await renderStills(specs).catch((e) => [{ok: false, error: e.message}]);
   fs.writeFileSync(path.join(projectDir(p.id), 'concepts.json'), JSON.stringify(doc, null, 2));
   const bad = r.filter((x) => !x.ok);
   broadcast({type: 'job', projectId: p.id, text: bad.length ? `Samples: ${bad.length} failed (${bad[0].error})` : 'Samples updated', done: true});
+  endProcess(sp, {status: bad.length ? 'error' : 'done', error: bad[0]?.error});
   changed(p.id);
 }));
 
@@ -584,7 +792,7 @@ app.put('/api/settings', wrap(async (req, res) => {
 // check that the chosen AI model answers (key, address and model name)
 app.post('/api/settings/test-ai', wrap(async (req, res) => {
   const cfg = aiConfig();
-  if (cfg.provider === 'claude') return res.json({ok: true, text: 'Using your Claude Code login.'});
+  if (cfg.provider === 'claude') return res.json({ok: true, text: `Using your Claude Code login (${cfg.model ? `model ${cfg.model}` : 'default model'}).`});
   if (cfg.provider === 'codex') {
     const result = await new Promise((resolve) => execFile('codex', ['login', 'status'], {windowsHide: true}, (error, stdout, stderr) => resolve({error, stdout, stderr})));
     return res.json({ok: !result.error, text: result.error ? `Codex CLI login unavailable: ${String(result.stderr || result.error.message).trim()}` : 'Codex CLI is available and signed in on this PC.'});
@@ -632,27 +840,44 @@ app.post('/api/projects/:id/render', wrap(async (req, res) => {
   const p = need(req.params.id);
   if (renderJob && !renderJob.done) return res.status(409).json({error: `Already rendering ${renderJob.projectId}`});
   const scale = req.body.draft ? 0.5 : 1;
+  // MP4 is rendered directly. GIF and WebP are rendered as an MP4 first, then converted (no sound, loops forever).
+  const asked = req.body.format ?? p.brief.outputFormat;
+  const format = OUTPUT_FORMATS[asked] ? asked : 'mp4', ext = OUTPUT_FORMATS[format].ext, label = OUTPUT_FORMATS[format].label;
+  const animWidth = ANIM_WIDTHS.includes(Number(p.brief.animWidth)) ? Number(p.brief.animWidth) : 480;
+  const animFps = ANIM_FPS.includes(Number(p.brief.animFps)) ? Number(p.brief.animFps) : 15;
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
-  const rel = `renders/${p.id}-${stamp}${scale < 1 ? '-draft' : ''}.mp4`;
-  renderJob = {projectId: p.id, file: rel, stage: 'bundling', progress: 0, draft: scale < 1, startedAt: Date.now()};
+  const rel = `renders/${p.id}-${stamp}${scale < 1 ? '-draft' : ''}.${ext}`;
+  const relVideo = format === 'mp4' ? rel : `renders/_tmp-${p.id}-${stamp}.mp4`;
+  renderJob = {projectId: p.id, file: rel, format, stage: 'bundling', progress: 0, draft: scale < 1, startedAt: Date.now()};
   renderAbort = new AbortController();
+  const proc = startProcess({kind: 'render', label: `${scale < 1 ? 'Draft' : 'Final'} render (${label}) · ${p.title}`, projectId: p.id});
   p.status = 'rendering'; saveProject(p); changed(p.id);
   res.json(renderJob);
   let last = 0;
+  const progress = (e) => { Object.assign(renderJob, e); patchProcess(proc, {progress: e.progress, stage: e.stage}); if (Date.now() - last > 400 || e.progress === 1) { last = Date.now(); broadcast({type: 'render', ...renderJob}); } };
   try {
     syncLook(p);
-    const info = await renderVideo({composition: compId(p.id), out: path.join(projectDir(p.id), rel), scale, signal: renderAbort.signal, props: {lookDraft: scale < 1},
-      onProgress: (e) => { Object.assign(renderJob, e); if (Date.now() - last > 400 || e.progress === 1) { last = Date.now(); broadcast({type: 'render', ...renderJob}); } }});
+    const info = await renderVideo({composition: compId(p.id), out: path.join(projectDir(p.id), relVideo), scale, signal: renderAbort.signal, props: {lookDraft: scale < 1}, onProgress: progress});
+    let outW = info.width * scale, outH = info.height * scale;
+    if (format !== 'mp4') {
+      progress({stage: 'converting', progress: 0, frames: 0, total: 0});
+      try {
+        await convertAnimated({format, src: path.join(projectDir(p.id), relVideo), out: path.join(projectDir(p.id), rel), width: animWidth, fps: animFps, durationSec: info.durationInFrames / info.fps, signal: renderAbort.signal, onProgress: (v) => progress({stage: 'converting', progress: v})});
+      } finally { fs.rmSync(path.join(projectDir(p.id), relVideo), {force: true}); }
+      outW = Math.min(animWidth, outW); outH = Math.round((outW / (info.width * scale)) * outH / 2) * 2;
+    }
     const q = getProject(p.id);
     let exported = null, exportError = null;
     try { exported = exportRender(q, rel); } catch (e) { exportError = String(e.message); }
-    q.renders.unshift({file: rel, at: new Date().toISOString(), draft: scale < 1, durationSec: info.durationInFrames / info.fps, width: info.width * scale, height: info.height * scale, exported});
+    q.renders.unshift({file: rel, format, at: new Date().toISOString(), draft: scale < 1, durationSec: info.durationInFrames / info.fps, width: outW, height: outH, exported, ...(format === 'mp4' ? {} : {fps: animFps})});
     q.status = 'done'; saveProject(q);
     Object.assign(renderJob, {done: true, stage: 'done', progress: 1, exported, exportError});
+    endProcess(proc, {status: 'done'});
     appendLog(p.id, {kind: 'system', text: `Rendered ${rel}${exported ? `, saved to ${exported}` : ''}${exportError ? ` (copy to output folder failed: ${exportError})` : ''}`});
   } catch (e) {
     const q = getProject(p.id); q.status = 'review'; saveProject(q);
     Object.assign(renderJob, {done: true, stage: 'error', error: renderAbort.signal.aborted ? 'Cancelled' : String(e.message).split('\n')[0]});
+    endProcess(proc, {status: renderAbort.signal.aborted ? 'stopped' : 'error', error: renderJob.error});
   }
   broadcast({type: 'render', ...renderJob});
   changed(p.id);
@@ -665,19 +890,26 @@ let thumbsRunning = false;
 const thumbsFor = async (force) => {
   if (thumbsRunning) return;
   thumbsRunning = true;
+  let tp = null;
   try {
     const todo = listPresets().filter((pr) => pr.example?.composition && (force?.includes(pr.id) || !fs.existsSync(path.join(THUMBS, `${pr.id}.png`))));
     if (!todo.length) return;
     console.log(`Rendering ${todo.length} preset thumbnails…`);
+    tp = startProcess({kind: 'stills', source: 'render', label: `Preset thumbnails (${todo.length})`});
+    activityLog(`Rendering ${todo.length} preset thumbnail(s) in the background`, {source: 'render'});
     await renderStills(todo.map((pr) => ({composition: pr.example.composition, frame: Math.round((pr.example.t ?? 2) * 30), out: path.join(THUMBS, `${pr.id}.png`)})));
+    activityLog('Preset thumbnails ready', {source: 'render', level: 'ok'});
+    endProcess(tp, {status: 'done'});
     broadcast({type: 'projects'});
   } catch (e) {
     console.error('Preset thumbnails failed:', e.message);
+    activityLog(`Preset thumbnails failed: ${clip(e.message, 160)}`, {source: 'render', level: 'error'});
+    endProcess(tp, {status: 'error', error: e.message});
   } finally { thumbsRunning = false; }
 };
 
 // ---------- files ----------
-app.use('/data', (req, res, next) => (/^\/(settings\.json|[^/]+\/agent-session\.json)$/i.test(decodeURIComponent(req.path)) ? res.status(404).end() : next())); // holds the API key / raw model history
+app.use('/data', (req, res, next) => (/^\/(settings\.json|[^/]+\/agent-session[^/]*\.json)$/i.test(decodeURIComponent(req.path)) ? res.status(404).end() : next())); // holds the API key / raw model history
 app.use('/data', express.static(DATA, {fallthrough: false}));
 app.use('/public', express.static(path.join(REEL, 'public'), {fallthrough: false}));
 app.use(express.static(WEB, {setHeaders: (res) => res.set('Cache-Control', 'no-cache')}));
@@ -695,6 +927,7 @@ const recoverStuck = () => {
     const before = q.status;
     q.status = readStoryboard(id) ? (q.renders?.length ? 'done' : 'review') : readConcepts(id)?.concepts?.length ? 'concepts' : 'brief';
     saveProject(q);
+    activityLog(`${id} was ${before} when the studio last stopped; reset to "${q.status}"`, {projectId: id, level: 'warn'});
     appendLog(id, {kind: 'error', text: `Video Studio stopped while this was ${before} (often the PC ran out of memory). Status reset to "${q.status}"; your files are kept. Start the step again.`});
     console.log(`  ! ${id}: was ${before} when the studio stopped, reset to ${q.status}`);
   }
@@ -722,9 +955,30 @@ const server = app.listen(PORT, (err) => {
   if (ai.provider !== 'claude') console.log(`  AI model: ${ai.model} via ${ai.baseUrl} (change it under "AI model" on the home page)\n`);
   else if (process.platform !== 'darwin' && !fs.existsSync(creds)) console.log('  ! Not signed in to Claude Code on this PC. Run "claude" in a terminal and type /login.\n');
   else console.log('  Claude: using your local Claude Code login (no API key)\n');
-  if (!process.env.NO_REMOTION_STUDIO) startRemotionStudio((s) => { if (/error/i.test(s)) process.stdout.write(`[remotion] ${s}`); });
+  activityLog(`Video Studio started on ${URL_}`, {level: 'ok'});
+  if (!process.env.NO_REMOTION_STUDIO) {
+    activityLog('Starting the Remotion preview server…');
+    let previewReady = false;
+    startRemotionStudio((s) => {
+      if (/error/i.test(s)) { process.stdout.write(`[remotion] ${s}`); activityLog(`Remotion preview: ${clip(s.replace(/\x1b\[[0-9;]*m/g, ''), 200)}`, {level: 'error'}); }
+      else if (!previewReady && /ready|http:\/\/localhost/i.test(s)) { previewReady = true; activityLog(`Remotion preview server ready on port ${STUDIO_PORT}`, {level: 'ok'}); }
+    });
+  }
   openBrowser();
   setTimeout(() => thumbsFor(), 1500);
+  // Heartbeat: lets every open page show "alive, idle" or "working for N s, last output N s ago".
+  setInterval(() => {
+    if (!clients.size) return;
+    const title = (id) => getProject(id)?.title ?? id;
+    rawBroadcast({
+      type: 'tick', now: Date.now(), uptime: Math.round(process.uptime()), freeMB: Math.round(os.freemem() / 2 ** 20),
+      busy: busyList().map((b) => ({projectId: b.id, title: title(b.id), startedAt: b.startedAt, lastAt: lastActivityAt(b.id)})),
+      render: renderJob && !renderJob.done ? {projectId: renderJob.projectId, title: title(renderJob.projectId), stage: renderJob.stage, progress: renderJob.progress, frames: renderJob.frames, total: renderJob.total, startedAt: renderJob.startedAt} : null,
+      media: mediaNow ? {...mediaNow, title: title(mediaNow.projectId)} : null,
+      thumbs: thumbsRunning,
+      procs: runningProcesses(),
+    });
+  }, 5000);
 });
 // already running (e.g. started from another terminal or VS Code): just open the web view
 server.on('error', (e) => {

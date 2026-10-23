@@ -31,6 +31,18 @@ export const aiConfig = () => {
   };
 };
 
+// Which engine answers and where: the model always answers somewhere remote unless it is Ollama/localhost; the tools it asks for
+// (reading and writing files, commands, rendering) always run on this PC.
+const LOCAL_HOST = /^(localhost|127\.|0\.0\.0\.0|\[?::1\]?$)/i;
+const LAN_HOST = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/;
+export const aiRuntime = (cfg = aiConfig()) => {
+  if (cfg.provider === 'claude') return {engine: 'Claude Code', model: cfg.model || 'default', where: 'cloud', host: 'Anthropic servers', tools: 'This PC'};
+  if (cfg.provider === 'codex') return {engine: 'Codex CLI', model: cfg.model, where: 'cloud', host: 'OpenAI servers', tools: 'This PC'};
+  let host = ''; try { host = new URL(cfg.baseUrl).hostname; } catch {}
+  const where = LOCAL_HOST.test(host) ? 'local' : LAN_HOST.test(host) ? 'lan' : 'cloud';
+  return {engine: PROVIDERS[cfg.provider].name, model: cfg.model, where, host: where === 'local' ? 'This PC (localhost)' : where === 'lan' ? `Local network (${host})` : host || 'remote server', tools: 'This PC'};
+};
+
 // What the browser sees: the key is only ever shown masked.
 export const publicSettings = () => {
   const s = readSettings();
@@ -39,7 +51,7 @@ export const publicSettings = () => {
   const key = ai.apiKey ?? '';
   return {
     ...s,
-    ai: {provider: cfg.provider, baseUrl: ai.baseUrl ?? '', model: ai.model ?? '', hasKey: !!cfg.apiKey, keySaved: !!key, keyHint: key ? `…${key.slice(-4)}` : ''},
+    ai: {provider: cfg.provider, baseUrl: ai.baseUrl ?? '', model: ai.model ?? '', hasKey: !!cfg.apiKey, keySaved: !!key, keyHint: key ? `…${key.slice(-4)}` : '', runtime: aiRuntime(cfg)},
     providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, {name: v.name, baseUrl: v.baseUrl ?? '', model: v.model ?? '', keyEnv: v.keyEnv ?? null}])),
   };
 };

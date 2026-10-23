@@ -53,7 +53,7 @@ review it and render. Your text replies appear in the app's activity panel: keep
 
 ## Tools you run with Bash (from the cwd)
 - \`node ../studio/bin/samples.mjs <id>\`: renders every concept sample in concepts.json to data/<id>/samples/.
-- \`node ../studio/bin/still.mjs <compositionId> <seconds|fN> <out.png> [propsJson]\`: one check still.
+- \`node ../studio/bin/still.mjs <compositionId> <seconds|fN> <out.png> [propsJson] [--scale 0.5]\`: one check still. Use --scale 0.5 for review stills.
 - \`node ../studio/bin/transcribe.mjs <audio> [--lang en|hi|auto]\`: word + sentence timestamps (writes <audio>.words.json).
   The app already transcribes uploaded voiceovers into data/<id>/transcripts/; use those if present.
   Whisper misspells brand names (e.g. "MagicBalt" = MagicBolt): fix spellings in captions and scripts.
@@ -75,6 +75,12 @@ review it and render. Your text replies appear in the app's activity panel: keep
 - ${STYLE_RULE}
 - Timing is driven by the voiceover when there is one: scene starts at sentence starts, key reveals on the spoken
   word. Without audio, aim for ~2.5 words/s of on-screen reading plus 0.4 s breathing room per beat.
+
+## Spend tokens carefully (the user pays for every token)
+- Search before reading: Grep/Glob, then Read only the lines you need (offset/limit). Never read a file twice, and never re-read what you just wrote or edited.
+- Do not read whole existing videos for inspiration. Read the preset's reuse list, KIT.md and the one component you need.
+- Review stills: render with --scale 0.5, look only at the frames that changed, at most 6 per round and at most 2 fix rounds. Do not re-render stills a change cannot have affected.
+- Batch edits, run tsc once per round, and keep replies to a few lines (no plans, recaps or restating the brief).
 
 ## Taste (the user's standing preferences)
 - Glossy, illustration-rich, brand-coloured, polished. Anything plain or flat reads as unfinished: start at that
@@ -226,3 +232,29 @@ Typecheck, render 2 check stills to compare with the existing checks/, and reply
 export const styleEditedNote = (p) => `(Note: the user changed colours in ${rel(projectCode(p.id))}/style.json from the browser. Keep those values unless they ask otherwise.)`;
 
 export const textEditedNote =(p) => `(Note: the user edited ${rel(projectCode(p.id))}/text.json directly in the browser. Keep their wording unless they ask otherwise.)`;
+
+// The user's scene-by-scene review of the built video. The AI applies it and re-renders the affected stills; the user then approves.
+export const reviewPrompt = (p, review, sb) => {
+  const scenes = sb?.scenes ?? [];
+  const sceneOf = (k) => scenes.find((s, i) => String(s.n ?? i + 1) === String(k));
+  const lines = [];
+  if (String(review.general ?? '').trim()) lines.push(`General (the whole video): ${review.general.trim()}`);
+  for (const [k, t] of Object.entries(review.notes ?? {})) {
+    const s = sceneOf(k);
+    lines.push(`Scene ${k}${s ? ` "${s.name}" (${Number(s.start).toFixed(1)}s-${Number(s.end).toFixed(1)}s)` : ''}: ${t.trim()}`);
+  }
+  for (const a of [...(review.adds ?? [])].sort((x, y) => x.after - y.after)) {
+    const prev = sceneOf(a.after);
+    lines.push(`NEW scene ${a.after === 0 ? 'at the very start' : `after scene ${a.after}${prev ? ` ("${prev.name}")` : ''}`}${a.sec ? `, about ${a.sec} s` : ''}: ${a.text.trim()}`);
+  }
+  return `## Task: apply the user's review of the built video ${compId(p.id)} (do NOT render the final MP4)
+The user looked at the scene frames and wrote these corrections. Apply exactly these, nothing else:
+${lines.map((l) => `- ${l.replace(/\n/g, '\n  ')}`).join('\n')}
+
+Rules:
+1. Change only what is listed. Leave the other scenes, the wording in text.json, the colours and audio.json as they are unless a correction needs it. Keep ${conceptsCompId(p.id)} working.
+2. A new scene goes in at the stated position (scene dur/starts in config.ts, its strings in text.json); later scenes keep their look and are renumbered. The voiceover is one audio file, so do not push later scenes out of sync with it. If the new scene needs spoken words, write a proposed voiceover line in its "vo" and tell the user in your reply that they must upload a new voiceover and press "Re-sync timing"; otherwise give it a visual-only length and say how you fitted it in.
+3. Keep ${projectDir(p.id)}/storyboard.json in sync (n, name, start, end, onScreen, vo, visual, durationSec), including new scene numbers.
+4. Typecheck, then render ONE check still for every changed or new scene (the middle of the scene) into ${projectDir(p.id)}/checks/, named like 03-inbox-13.6s.png (replace that scene's older still: same name, or delete the old file). Render them at normal size, because the user will look at them. Look at each one yourself once.
+Reply with one short line per scene saying what you changed (or why you could not) and the new total duration. The user will review the new frames and approve before anything is rendered.`;
+};

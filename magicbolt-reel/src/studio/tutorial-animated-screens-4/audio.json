@@ -1,0 +1,4 @@
+{
+  "voiceover": {"src": "studio/tutorial-animated-screens-4/agency-panell-trainin1.mp3", "volume": 1, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": 69.15},
+  "music": {"src": null, "volume": 0.25, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": null, "loop": true, "fadeInSec": 1, "fadeOutSec": 2, "duck": true, "duckLevel": 0.35}
+}

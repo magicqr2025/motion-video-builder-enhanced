@@ -7,13 +7,15 @@ import {query} from '@anthropic-ai/claude-agent-sdk';
 import {REEL, STUDIO, DATA, projectDir} from './paths.mjs';
 import {SYSTEM} from './prompts.mjs';
 import {getProject, saveProject, appendLog} from './projects.mjs';
-import {aiConfig, PROVIDERS} from './settings.mjs';
+import {aiConfig, aiRuntime, PROVIDERS} from './settings.mjs';
+import {startProcess, endProcess, addProcessTokens} from './activity.mjs';
 import {runOpenAITurn} from './providers/openai.mjs';
 import {writeRegistry} from './remotion.mjs';
 
 const LOST = /No conversation found with session ID/i;
 const running = new Map(); // projectId -> AbortController
 export const isBusy = (id) => running.has(id);
+export const busyList = () => [...running].map(([id, ac]) => ({id, startedAt: ac.startedAt}));
 export const stopAgent = (id) => running.get(id)?.abort();
 
 const inside = (file, dir) => { const r = path.relative(dir, path.resolve(REEL, file)); return r && !r.startsWith('..') && !path.isAbsolute(r); };
@@ -60,6 +62,19 @@ export const claudeEnv = async () => {
 };
 const NETWORK = /ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|Connection (refused|error)|network/i;
 
+// Token bookkeeping: running totals on the project, the last request's numbers, and one plain line in the activity log.
+const kfmt = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n));
+const recordUsage = (projectId, u, cost, send, procId, partial = false) => {
+  addProcessTokens(procId, u, cost); // the process ledger keeps this request's tokens and cost next to its running time
+  const p = getProject(projectId);
+  if (!p) return;
+  const t = p.tokens ?? {};
+  p.tokens = {input: (t.input ?? 0) + u.input, output: (t.output ?? 0) + u.output, cacheRead: (t.cacheRead ?? 0) + u.cacheRead, cacheWrite: (t.cacheWrite ?? 0) + u.cacheWrite};
+  p.lastTurn = {...u, cost: cost || null, at: Date.now()};
+  saveProject(p);
+  send({kind: 'usage', text: `Used ${partial ? 'before it stopped' : 'this request'}: ${kfmt(u.output)} written, ${kfmt(u.input + u.cacheWrite)} new input${u.cacheRead ? `, ${kfmt(u.cacheRead)} re-read from cache` : ''}${cost ? ` · about $${cost.toFixed(2)}` : ''}${u.context ? ` · conversation size ${kfmt(u.context)} tokens` : ''}`});
+};
+
 const short = (s, n = 110) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const relPath = (f) => { const r = path.relative(REEL, String(f ?? '')); return (r.startsWith('..') ? path.relative(STUDIO, String(f)) : r).split(path.sep).join('/'); };
 const toolLabel = (name, i = {}) => {
@@ -77,7 +92,7 @@ const toolLabel = (name, i = {}) => {
   }
 };
 
-const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool}) => new Promise((resolve, reject) => {
+const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool, onUsage}) => new Promise((resolve, reject) => {
   // A Codex thread keeps its original writable roots when resumed. Start a fresh
   // thread once so projects created before this workspace layout gain their data dir.
   if (project.codexWorkspaceVersion !== 2) {
@@ -90,7 +105,7 @@ const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool}
   }
   const modelArgs = ['--model', model];
   const args = project.codexSessionId
-    ? ['exec', 'resume', project.codexSessionId, `${SYSTEM}\n\n${prompt}`, '--json', ...modelArgs]
+    ? ['exec', 'resume', project.codexSessionId, prompt, '--json', ...modelArgs] // the thread already holds the system rules; do not pay for them again
     : ['exec', '--json', '--sandbox', 'workspace-write', '--cd', REEL, '--add-dir', projectDir(project.id), '--add-dir', path.join(STUDIO, 'presets'), ...modelArgs, `${SYSTEM}\n\n${prompt}`];
   const child = spawn('codex', args, {cwd: REEL, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe']});
   let stdout = '', stderr = '', resultError = null, finished = false;
@@ -112,6 +127,7 @@ const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool}
     else if (item.type === 'file_change') onTool('Edit', {file_path: item.changes?.[0]?.path ?? 'project files'});
     else if (item.type === 'error' && item.message) onStatus(item.message);
     if (e.type === 'error' && e.message) onStatus(e.message);
+    if (e.type === 'turn.completed' && e.usage) onUsage?.({input: Math.max(0, (e.usage.input_tokens ?? 0) - (e.usage.cached_input_tokens ?? 0)), output: e.usage.output_tokens ?? 0, cacheRead: e.usage.cached_input_tokens ?? 0, cacheWrite: 0, context: e.usage.input_tokens ?? 0});
     if (e.type === 'turn.failed') resultError = e.error?.message ?? JSON.stringify(e.error ?? e);
   };
   child.stdout.on('data', (chunk) => {
@@ -136,14 +152,21 @@ const runCodexTurn = ({project, prompt, model, signal, onText, onStatus, onTool}
 export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) => {
   if (running.has(projectId)) throw new Error('Claude is still working on this project. Stop it or wait.');
   const ac = new AbortController();
+  ac.startedAt = Date.now();
   running.set(projectId, ac);
-  const send = (e) => { emit?.({type: 'agent', projectId, ...e}); if (e.kind !== 'status') appendLog(projectId, e); };
+  const rt = aiRuntime(); // which engine/model answers and where; saved with the process so history shows it
+  const proc = startProcess({kind: 'ai', label: short(label ?? prompt, 160), projectId, model: rt.model || rt.engine, where: rt.where});
+  let lastError = '';
+  const send = (e) => { if (e.kind === 'error') lastError = e.text; emit?.({type: 'agent', projectId, ...e}); if (e.kind !== 'status') appendLog(projectId, e); };
   let p = getProject(projectId);
   appendLog(projectId, {kind: 'user', text: label ?? prompt});
   emit?.({type: 'agent', projectId, kind: 'user', text: label ?? prompt});
   send({kind: 'status', busy: true});
   let ok = false;
   const cfg = aiConfig();
+  // A stopped or failed request never sends its final usage, so keep a running count from every model reply
+  const seen = {input: 0, output: 0, cacheRead: 0, cacheWrite: 0, context: 0};
+  let usageRecorded = false;
   try {
     if (cfg.provider === 'codex') {
       if (!cfg.model) throw new Error('Choose a model ID that is available in your Codex account. Set it in AI model on the Studio home page.');
@@ -152,6 +175,7 @@ export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) =>
         onText: (text) => send({kind: 'text', text}),
         onStatus: (text) => send({kind: 'text', text}),
         onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
+        onUsage: (u) => recordUsage(projectId, u, 0, send, proc),
       });
       ok = r.ok;
       if (!ok) send({kind: 'error', text: r.error});
@@ -167,7 +191,7 @@ export const runAgent = async (projectId, prompt, {emit, label, onDone} = {}) =>
         onTool: (name, input) => send({kind: 'tool', tool: name, text: toolLabel(name, input)}),
       });
       ok = r.ok;
-      p = getProject(projectId); p.tokens = {input: (p.tokens?.input ?? 0) + r.usage.input, output: (p.tokens?.output ?? 0) + r.usage.output}; saveProject(p);
+      recordUsage(projectId, {input: r.usage.input, output: r.usage.output, cacheRead: 0, cacheWrite: 0, context: 0}, 0, send, proc);
       if (!ok) send({kind: 'error', text: /401|403|api key|unauthor/i.test(r.error ?? '') ? `${r.error}
 Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home page.` : r.error});
       return ok;
@@ -178,6 +202,7 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
     for (let attempt = 0; attempt < 3; attempt++) {
       let failure = null; // error text of this try
       let answered = false; // a real (non-error) assistant message arrived
+      let ctxTokens = 0; // size of the conversation at the latest model call
       try {
         const q = query({
           prompt,
@@ -190,7 +215,7 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
             permissionMode: 'default',
             canUseTool,
             abortController: ac,
-            model: process.env.STUDIO_MODEL || undefined,
+            model: cfg.model || process.env.STUDIO_MODEL || undefined, // chosen on the home page (AI model); empty = Claude Code's default
             env,
             title: `Video Studio · ${p.title}`,
           },
@@ -201,6 +226,9 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
             // saved. Only remember the session once Claude really answered, or the next run fails to resume it.
             if (m.error || m.message?.model === '<synthetic>') continue;
             answered = true;
+            const mu = m.message?.usage;
+            if (mu) { seen.input += mu.input_tokens ?? 0; seen.output += mu.output_tokens ?? 0; seen.cacheRead += mu.cache_read_input_tokens ?? 0; seen.cacheWrite += mu.cache_creation_input_tokens ?? 0; }
+            if (mu && !m.parent_tool_use_id) seen.context = ctxTokens = (mu.input_tokens ?? 0) + (mu.cache_read_input_tokens ?? 0) + (mu.cache_creation_input_tokens ?? 0);
             if (m.session_id && p.sessionId !== m.session_id) { p = getProject(projectId); p.sessionId = m.session_id; saveProject(p); }
             if (m.parent_tool_use_id) continue;
             for (const b of m.message.content ?? []) {
@@ -210,6 +238,9 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
           } else if (m.type === 'result') {
             ok = m.subtype === 'success' && !m.is_error;
             p = getProject(projectId); p.cost = (p.cost ?? 0) + (m.total_cost_usd ?? 0); saveProject(p);
+            const ru = m.usage ?? {};
+            recordUsage(projectId, {input: ru.input_tokens ?? 0, output: ru.output_tokens ?? 0, cacheRead: ru.cache_read_input_tokens ?? 0, cacheWrite: ru.cache_creation_input_tokens ?? 0, context: ctxTokens}, m.total_cost_usd ?? 0, send, proc);
+            usageRecorded = true;
             if (!ok) failure = m.result || m.errors?.join('\n') || `Stopped (${m.subtype})`;
           }
         }
@@ -242,6 +273,8 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
     send({kind: 'error', text: ac.signal.aborted ? 'Stopped.' : cfg.provider !== 'claude' && /401|403|unauthor|invalid.*key/i.test(msg) ? `${msg}
 Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home page.` : msg});
   } finally {
+    if (!usageRecorded && (seen.input || seen.output || seen.cacheRead || seen.cacheWrite)) recordUsage(projectId, seen, 0, send, proc, true);
+    endProcess(proc, {status: ac.signal.aborted ? 'stopped' : ok ? 'done' : 'error', error: ok ? null : lastError});
     running.delete(projectId);
     try { writeRegistry(); } catch {}
     await onDone?.(ok);
