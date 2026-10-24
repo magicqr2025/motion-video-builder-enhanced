@@ -107,7 +107,7 @@ export const RemotionRoot = () => (
     {/* MagicBolt AI logo animation: transparent, and on white */}
     <Composition id="LogoAnim" component={LogoAnim} defaultProps={{}} durationInFrames={150} fps={30} width={1440} height={480} />
     <Composition id="LogoAnimWhite" component={LogoAnim} defaultProps={{bg: '#ffffff'}} durationInFrames={150} fps={30} width={1440} height={480} />
-    {/* videos built by the Video Studio app (../studio) */}
+    {/* videos built by the MotionStudio app (../studio) */}
     <StudioCompositions />
   </>
 );

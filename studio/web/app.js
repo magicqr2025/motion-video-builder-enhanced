@@ -1,4 +1,4 @@
-// MagicBolt Video Studio: browser side. Plain JS modules, no build step.
+// MotionStudio by MagicBolt.ai: browser side. Plain JS modules, no build step.
 import {initTools, renderTools, toolsChanged} from './tools.js';
 import {initStorage, renderStorage} from './storage.js';
 import {initReview, reviewHtml, reviewEditing} from './review.js';
@@ -9,10 +9,11 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const api = async (url, opts = {}) => {
   const res = await fetch(url, {headers: opts.body && !(opts.body instanceof FormData) ? {'Content-Type': 'application/json'} : {}, ...opts, body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body}).catch((e) => {
-    note(`Could not reach the studio server for ${opts.method ?? 'GET'} ${url.split('?')[0]}. Is the Video Studio window still open?`, {level: 'error', source: 'system'});
+    note(`Could not reach the studio server for ${opts.method ?? 'GET'} ${url.split('?')[0]}. Is the MotionStudio window still open?`, {level: 'error', source: 'system'});
     throw e;
   });
   const j = await res.json().catch(() => ({}));
+  if (res.status === 401 && j.login) { location.replace(`/login?next=${encodeURIComponent(location.pathname + location.hash)}`); throw new Error('Sign in required.'); }
   if (!res.ok) throw new Error(j.error || res.statusText);
   return j;
 };
@@ -58,6 +59,21 @@ const applyTheme = (t) => {
 };
 applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 document.addEventListener('fullscreenchange', () => { const b = $('#fs-btn'); if (b) { b.classList.toggle('is-fs', !!document.fullscreenElement); b.title = document.fullscreenElement ? 'Exit full screen' : 'Full screen'; } });
+
+// ---------- who is signed in (top right) ----------
+(async () => {
+  try {
+    const {user} = await (await fetch('/api/session')).json();
+    if (!user) return;
+    $('#uc-av').textContent = (user.name || user.username).trim().charAt(0).toUpperCase();
+    $('#uc-name').textContent = user.name || user.username;
+    const left = user.daysLeft;
+    $('#uc-exp').textContent = left <= 0 ? 'expires today' : left <= 14 ? `expires in ${left} day${left === 1 ? '' : 's'}` : `until ${user.expiresAt}`;
+    $('#user-chip').classList.toggle('soon', left <= 14);
+    $('#user-chip').title = `Signed in as ${user.username}. Access runs until ${user.expiresAt}.`;
+    $('#user-chip').hidden = false;
+  } catch { /* the chip is optional */ }
+})();
 
 // ---------- routing ----------
 const route = () => {
@@ -146,31 +162,15 @@ const aiChip = () => {
 const kTok = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n ?? 0));
 const aiName = () => { const ai = S.state?.settings?.ai; return !ai || ai.provider === 'claude' ? 'Claude' : ai.provider === 'codex' ? 'Codex' : (ai.model || S.state.settings.providers[ai.provider]?.model || 'AI'); };
 const aiCard = () => {
-  const st = S.state.settings ?? {};
-  const ai = st.ai ?? {provider: 'claude'};
-  const provs = st.providers ?? {claude: {name: 'Claude Code (your login)'}};
-  const def = provs[ai.provider] ?? {};
-  const isClaude = ai.provider === 'claude';
-  const isCodex = ai.provider === 'codex';
+  const ai = S.state.settings?.ai ?? {};
+  const label = CLAUDE_MODELS.find(([v]) => v === (ai.model ?? ''))?.[1] ?? ai.model ?? 'default';
   return `<details class="card ai-card" style="margin:0 0 22px" open>
-    <summary class="spread" style="cursor:pointer"><b>AI model</b><span class="muted small">${esc(provs[ai.provider]?.name ?? 'Claude')}${isClaude ? ` · ${esc(CLAUDE_MODELS.find(([v]) => v === (ai.model ?? ''))?.[1] ?? ai.model ?? 'default')}` : isCodex ? '' : ` · ${esc(ai.model || def.model)}`}</span></summary>
+    <summary class="spread" style="cursor:pointer"><b>AI</b><span class="muted small">Claude Code on this PC · ${esc(label)}</span></summary>
     <div id="ai-form" style="margin-top:12px;display:grid;gap:10px">
-      ${select('ai-provider', 'Provider', ai.provider, Object.entries(provs).map(([k, v]) => [k, v.name]))}
-      ${isClaude ? `<p class="small muted" style="margin:0">Uses the Claude Code login on this PC (run <code>claude</code> and <code>/login</code> once). No API key needed.</p>
-        ${select('claude-model', 'Model for building videos', ai.model ?? '', CLAUDE_MODELS)}
-        <p class="small" style="margin:-4px 0 0"><b>Where it runs:</b> the model answers on <b>${esc(ai.runtime?.host ?? 'Anthropic servers')}</b> (your prompts and the files it reads are sent there). Everything it does, reading and writing files, commands and rendering frames, runs on <b>this PC</b>.</p>
-        <p class="small muted" style="margin:-4px 0 0">Applies to every new request (concepts, builds, chat). A request already running keeps its model. If your plan does not include the model, the error shows in the chat panel; switch back to the default.</p>` : isCodex ? `
-        <p class="small muted" style="margin:0">Uses the Codex CLI login on this PC. Enter a model ID available in your Codex account's model picker. No API key needed.</p>
-        ${field('ai-model', 'Codex model ID', ai.model, {placeholder: 'model ID from your Codex model picker', hint: 'This must be available to your signed-in ChatGPT account.'})}` : `
-        ${field('ai-model', 'Model', ai.model, {placeholder: def.model || 'model name', hint: 'The exact model id your provider uses. It must support tool calling; vision is needed to check rendered frames.'})}
-        ${field('ai-baseUrl', 'API address', ai.baseUrl, {placeholder: def.baseUrl || 'https://…/v1'})}
-        ${field('ai-apiKey', 'API key', '', {type: 'password', placeholder: ai.keySaved ? `saved (${ai.keyHint}): leave empty to keep` : ai.hasKey ? `using ${def.keyEnv} from the environment` : ai.provider === 'ollama' ? 'not needed for Ollama' : 'paste your key', hint: 'Stored only on this PC in studio/data/settings.json.'})}`}
-      <div class="row" style="gap:8px">
-        ${isClaude ? '' : '<button class="btn primary sm" data-action="save-ai">Save</button>'}
-        <button class="btn ghost sm" data-action="test-ai">Test connection</button>
-        ${ai.keySaved ? '<button class="btn ghost sm" data-action="clear-ai-key">Remove saved key</button>' : ''}
-        <span class="small muted" id="ai-test"></span>
-      </div>
+      <p class="small muted" style="margin:0">MotionStudio works through the Claude Code login on this PC. There is nothing to connect and no API key.</p>
+      ${ai.signedIn === false ? '<div class="st-err">Claude Code is not signed in on this PC yet. Open a terminal, run <b>claude</b>, then type <b>/login</b> once.</div>' : ''}
+      ${select('claude-model', 'Model for building videos', ai.model ?? '', CLAUDE_MODELS)}
+      <p class="small muted" style="margin:-4px 0 0">Applies to every new request (concepts, builds, chat). A request already running keeps its model. If your plan does not include the model, the error shows in the chat panel; switch back to the default.</p>
     </div>
   </details>`;
 };
@@ -1128,6 +1128,15 @@ document.addEventListener('click', async (ev) => {
         applyPanelState();
         break;
       case 'home': go(null); break;
+      case 'logout': await fetch('/api/logout', {method: 'POST'}); location.replace('/login'); break;
+      case 'quit': {
+        if (!confirm('Quit MotionStudio? The studio stops and this window closes.')) break;
+        let r = await fetch('/api/quit', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+        if (r.status === 409) { const j = await r.json(); if (!confirm(`${j.error}\n\nQuit anyway?`)) break; r = await fetch('/api/quit', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({force: true})}); }
+        document.body.innerHTML = '<div style="min-height:100vh;display:grid;place-items:center;font:16px Poppins,system-ui,sans-serif;color:#888">MotionStudio has closed. You can close this window.</div>';
+        setTimeout(() => window.close(), 800);
+        break;
+      }
       case 'toggle-theme': applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
       case 'toggle-fullscreen': if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); break;
       case 'resume-build':
@@ -1373,7 +1382,7 @@ document.addEventListener('change', async (ev) => {
     }
     if (t.dataset.role) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.role)}`, {method: 'PATCH', body: {role: t.value}}); return; }
     if (t.dataset.note != null) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.note)}`, {method: 'PATCH', body: {note: t.value}}); return; }
-    if (t.name === 'claude-model') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {model: t.value}}}); S.aiOpen = true; renderHome(); toast(t.value ? `Video Studio will use ${t.value}.` : 'Video Studio will use the Claude Code default model.'); return; }
+    if (t.name === 'claude-model') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {model: t.value}}}); S.aiOpen = true; renderHome(); toast(t.value ? `MotionStudio will use ${t.value}.` : 'MotionStudio will use the Claude Code default model.'); return; }
     if (t.name === 'ai-provider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); S.aiOpen = true; renderHome(); return; }
     if (t.name === 'plannerProvider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); renderProject(); return; }
     if (t.name?.startsWith('planner')) { setBrief(t.name, t.value); return; }

@@ -1,4 +1,4 @@
-// The soundtrack of every studio video. Settings live in src/studio/<id>/audio.json, which the Video Studio's
+// The soundtrack of every studio video. Settings live in src/studio/<id>/audio.json, which the MotionStudio's
 // Audio tab edits; the generated registry.tsx wraps the video with <StudioAudio/> when that file exists, so a
 // video's own code must NOT render <Audio> for its voiceover or music.
 // All numbers are seconds on the video timeline unless named *Sec of the source file.

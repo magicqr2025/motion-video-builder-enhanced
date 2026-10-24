@@ -1,6 +1,7 @@
 // App settings in data/settings.json (never committed): output folder and which AI model runs the agent.
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {DATA} from './paths.mjs';
 
 const SETTINGS = path.join(DATA, 'settings.json');
@@ -18,18 +19,16 @@ export const PROVIDERS = {
   custom: {name: 'Other OpenAI-compatible', baseUrl: '', keyEnv: null, model: ''},
 };
 
-// The agent's view: provider + resolved endpoint, model and key.
+// The agent's view. MotionStudio always works through the Claude Code login on this PC: no API key, no other provider,
+// nothing to connect. (The other providers below stay in the code but are not reachable from the app.)
 export const aiConfig = () => {
   const ai = readSettings().ai ?? {};
-  const id = PROVIDERS[ai.provider] ? ai.provider : 'claude';
-  const def = PROVIDERS[id];
-  return {
-    provider: id,
-    baseUrl: (ai.baseUrl || def.baseUrl || '').replace(/\/+$/, ''),
-    model: ai.model || def.model || '',
-    apiKey: ai.apiKey || (def.keyEnv ? process.env[def.keyEnv] ?? '' : ''),
-  };
+  const model = (ai.provider ?? 'claude') === 'claude' ? String(ai.model ?? '') : ''; // a model name saved for another provider means nothing to Claude
+  return {provider: 'claude', baseUrl: '', model, apiKey: ''};
 };
+
+// Signed in to Claude Code on this PC? (macOS keeps the login in the Keychain, so it cannot be checked from a file.)
+export const claudeSignedIn = () => process.platform === 'darwin' || fs.existsSync(path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), '.credentials.json'));
 
 // Which engine answers and where: the model always answers somewhere remote unless it is Ollama/localhost; the tools it asks for
 // (reading and writing files, commands, rendering) always run on this PC.
@@ -51,13 +50,14 @@ export const publicSettings = () => {
   const key = ai.apiKey ?? '';
   return {
     ...s,
-    ai: {provider: cfg.provider, baseUrl: ai.baseUrl ?? '', model: ai.model ?? '', hasKey: !!cfg.apiKey, keySaved: !!key, keyHint: key ? `…${key.slice(-4)}` : '', runtime: aiRuntime(cfg)},
+    ai: {provider: 'claude', baseUrl: '', model: cfg.model, hasKey: false, keySaved: false, keyHint: '', runtime: aiRuntime(cfg), signedIn: claudeSignedIn()},
     providers: Object.fromEntries(Object.entries(PROVIDERS).map(([k, v]) => [k, {name: v.name, baseUrl: v.baseUrl ?? '', model: v.model ?? '', keyEnv: v.keyEnv ?? null}])),
   };
 };
 
 // Apply {provider, baseUrl, model, apiKey}; an empty apiKey leaves the saved one, apiKey: null clears it.
-export const updateAi = (patch = {}) => {
+export const updateAi = (rawPatch = {}) => {
+  const patch = 'model' in rawPatch ? {model: rawPatch.model} : {}; // only the model can be changed: always the local Claude Code login
   const s = readSettings();
   const ai = {...(s.ai ?? {})};
   if ('provider' in patch) {
@@ -65,6 +65,7 @@ export const updateAi = (patch = {}) => {
     if (patch.provider !== ai.provider) { ai.baseUrl = ''; ai.model = ''; }
     ai.provider = patch.provider;
   }
+  ai.provider = 'claude';
   if ('baseUrl' in patch) ai.baseUrl = String(patch.baseUrl ?? '').trim();
   if ('model' in patch) ai.model = String(patch.model ?? '').trim();
   if (patch.apiKey === null) delete ai.apiKey;

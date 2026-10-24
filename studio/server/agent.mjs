@@ -220,7 +220,7 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
             abortController: ac,
             model: cfg.model || process.env.STUDIO_MODEL || undefined, // chosen on the home page (AI model); empty = Claude Code's default
             env,
-            title: `Video Studio · ${p.title}`,
+            title: `MotionStudio · ${p.title}`,
           },
         });
         for await (const m of q) {
@@ -266,7 +266,7 @@ Check the API key for ${PROVIDERS[cfg.provider].name} in Settings on the home pa
         continue;
       }
       const hint = LOST.test(failure) ? ''
-        : NETWORK.test(failure) ? '\nThis PC could not reach Anthropic. Check the internet / VPN, then restart Video Studio from a normal terminal (a proxy set by the tool that started it can block Claude).'
+        : NETWORK.test(failure) ? '\nThis PC could not reach Anthropic. Check the internet / VPN, then restart MotionStudio from a normal terminal (a proxy set by the tool that started it can block Claude).'
         : /\blog ?in\b|not (logged|signed) in|authenticat|\b401\b|credential/i.test(failure) ? '\nSign in to Claude Code on this PC: run "claude" in a terminal and type /login, then try again.' : '';
       send({kind: 'error', text: `${failure}${hint}`});
       break;

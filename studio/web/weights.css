@@ -68,6 +68,9 @@ table.sb td.tm { font-weight: 500; }
 .nav-item .ni-ic { font-weight: 600; }
 .nav-item b { font-weight: 500; }
 .top-link { font-weight: 500; }
+.brand-tx b { font-weight: 500; }
+.uc-av { font-weight: 500; }
+.uc-tx b { font-weight: 400; }
 .pill.ai { font-weight: 500; }
 .bnav button { font-weight: 500; }
 .bsec-head .n { font-weight: 600; }
@@ -96,3 +99,6 @@ label.f.ai-filled > span::after, .f.ai-filled > .fl::after { font-weight: 500; }
 .tasks li.next small { font-weight: 500; }
 .tasks-ai summary { font-weight: 500; }
 .tasks-ai li.in_progress { font-weight: 500; }
+.lg-brand h1 { font-weight: 500; }
+.lg-f > span:first-child { font-weight: 400; }
+.lg-go { font-weight: 400; }

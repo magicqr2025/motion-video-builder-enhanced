@@ -117,7 +117,7 @@ export const onServerEvent = (e) => {
 const status = () => {
   const now = Date.now(), {aiName = 'The AI', aiTag} = A.ctx(), t = A.tick;
   const silent = now - A.lastSignal;
-  if (!A.connected || silent > 15000) return {tone: 'bad', text: silent > 15000 && A.connected ? `No signal from the studio server for ${fmtDur(silent)}. It may have stopped; check the Video Studio window.` : 'Lost the connection to the studio server. Retrying…'};
+  if (!A.connected || silent > 15000) return {tone: 'bad', text: silent > 15000 && A.connected ? `No signal from the studio server for ${fmtDur(silent)}. It may have stopped; check the MotionStudio window.` : 'Lost the connection to the studio server. Retrying…'};
   if (!t) return {tone: 'idle', text: 'Connected. Waiting for the first status update…'};
   const r = running();
   if (!r.length) {
@@ -380,10 +380,10 @@ export const initActivity = (getCtx) => {
       try { await navigator.clipboard.writeText(text); note('Copied the log to the clipboard.', {source: 'system'}); } catch { note('Could not copy the log (clipboard blocked).', {level: 'warn', source: 'system'}); }
     } else if (e.target.closest('#lg-dl')) {
       const a = document.createElement('a');
-      if (A.logSource !== 'live') { a.href = `/data/activity/log-${A.logSource}.jsonl`; a.download = `video-studio-log-${A.logSource}.jsonl`; }
+      if (A.logSource !== 'live') { a.href = `/data/activity/log-${A.logSource}.jsonl`; a.download = `motionstudio-log-${A.logSource}.jsonl`; }
       else {
         const text = logRows().map((x) => `${new Date(x.ts).toISOString()} [${x.tool || SRC[x.source] || x.source}${x.where ? ` @${x.where}` : ''}] ${x.level === 'error' ? 'ERROR ' : ''}${x.text}${x.n > 1 ? ` (x${x.n})` : ''}`).join('\n') + '\n';
-        a.href = URL.createObjectURL(new Blob([text], {type: 'text/plain'})); a.download = `video-studio-log-${dayKey(Date.now())}.txt`;
+        a.href = URL.createObjectURL(new Blob([text], {type: 'text/plain'})); a.download = `motionstudio-log-${dayKey(Date.now())}.txt`;
       }
       document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     } else if (e.target.closest('#lg-clear')) {

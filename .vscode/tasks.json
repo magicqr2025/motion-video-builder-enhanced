@@ -2,8 +2,8 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Video Studio",
-      "detail": "Starts MagicBolt Video Studio and opens it in the browser",
+      "label": "MotionStudio",
+      "detail": "Starts MotionStudio by MagicBolt.ai and opens it in the browser",
       "type": "shell",
       "command": "node studio/server/index.mjs",
       "isBackground": true,

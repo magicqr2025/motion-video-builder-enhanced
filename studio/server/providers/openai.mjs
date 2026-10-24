@@ -119,7 +119,7 @@ const post = async (cfg, headers, body, signal) => {
 };
 
 const chat = async (cfg, messages, signal) => {
-  const headers = {'Content-Type': 'application/json', ...(cfg.apiKey ? {Authorization: `Bearer ${cfg.apiKey}`} : {}), 'HTTP-Referer': 'http://localhost', 'X-Title': 'MagicBolt Video Studio'};
+  const headers = {'Content-Type': 'application/json', ...(cfg.apiKey ? {Authorization: `Bearer ${cfg.apiKey}`} : {}), 'HTTP-Referer': 'http://localhost', 'X-Title': 'MotionStudio by MagicBolt.ai'};
   for (let attempt = 0; ; attempt++) {
     const r = await post(cfg, headers, {model: cfg.model, messages, tools: TOOLS, tool_choice: 'auto'}, signal);
     if (r.ok) return r.json();

@@ -1,4 +1,4 @@
-// MagicBolt Video Studio: local web app. Brief -> concept stills -> approved -> full Remotion video -> render.
+// MotionStudio by MagicBolt.ai: local web app. Brief -> concept stills -> approved -> full Remotion video -> render.
 //   cd studio && npm start      (opens http://localhost:4321)
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,7 +11,7 @@ import {listPresets, listBrands, getPreset, listProjects, getProject, saveProjec
 import {runAgent, isBusy, stopAgent, busyList} from './agent.mjs';
 import {bindActivity, activityLog, recentActivity, lastActivityAt, startProcess, endProcess, patchProcess, listProcesses, runningProcesses, processesCsv, readHistory, listDays} from './activity.mjs';
 import {conceptsPrompt, buildPrompt, resumeBuildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, reviewPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
-import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, writeRegistry, sweepBundles, STUDIO_PORT} from './remotion.mjs';
+import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, stopRemotionStudio, writeRegistry, sweepBundles, STUDIO_PORT} from './remotion.mjs';
 import {transcribeFile} from './transcribe.mjs';
 import {readSettings, writeSettings, publicSettings, updateAi, aiConfig, aiRuntime} from './settings.mjs';
 import {pingModel} from './providers/openai.mjs';
@@ -20,6 +20,7 @@ import {mountFiles} from './files.mjs';
 import {emptyReview, cleanReview, pendingCount, reviewSummary, clearSent} from './review.mjs';
 import {mountStory, stopStory} from './story.mjs';
 import {mountStorage} from './storage.mjs';
+import {mountAuth} from './auth.mjs';
 import {ensureDarkCss} from './darkcss.mjs';
 import {convertAnimated, OUTPUT_FORMATS, ANIM_WIDTHS, ANIM_FPS} from './animate.mjs';
 import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges, lookChangePrompt} from './look.mjs';
@@ -27,6 +28,25 @@ import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges,
 const PORT = Number(process.env.PORT ?? 4321);
 const app = express();
 app.use(express.json({limit: '2mb'}));
+
+// Sign-in comes first: everything below needs a signed-in admin (see auth.mjs). /api/presence and /api/health are open so the
+// desktop launcher can tell whether a window is still open.
+mountAuth(app, {log: (text, level) => activityLog(text, {source: 'system', level})});
+const presence = new Set();
+app.get('/api/presence', (req, res) => {
+  res.set({'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive'});
+  res.flushHeaders(); res.write('retry: 2000' + String.fromCharCode(10, 10));
+  presence.add(res);
+  const ping = setInterval(() => res.write(': ping' + String.fromCharCode(10, 10)), 20000);
+  req.on('close', () => { clearInterval(ping); presence.delete(res); });
+});
+app.get('/api/health', (req, res) => res.json({ok: true, app: 'MotionStudio', windows: presence.size + clients.size, busy: busyList().length > 0 || !!(renderJob && !renderJob.done)}));
+app.post('/api/quit', (req, res) => {
+  if ((busyList().length || (renderJob && !renderJob.done)) && !req.body?.force) return res.status(409).json({error: 'Something is still running (an AI task or a render). Stop it first, or quit anyway.', busy: true});
+  res.json({ok: true});
+  activityLog('MotionStudio is closing (asked from the window)', {source: 'system', level: 'info'});
+  setTimeout(() => { try { stopRemotionStudio(); } catch { /* not running */ } process.exit(0); }, 400);
+});
 
 // ---------- live events (server-sent) ----------
 const clients = new Set();
@@ -122,7 +142,7 @@ app.use('/api', (req, res, next) => {
 
 app.get('/api/processes', (req, res) => res.json(listProcesses({project: String(req.query.project ?? '')})));
 app.get('/api/processes.csv', (req, res) => {
-  res.set({'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="video-studio-processes-${new Date().toLocaleDateString('en-CA')}.csv"`});
+  res.set({'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="motionstudio-processes-${new Date().toLocaleDateString('en-CA')}.csv"`});
   res.send(processesCsv());
 });
 app.get('/api/activity/days', (req, res) => res.json({days: listDays()}));
@@ -979,7 +999,7 @@ const recoverStuck = () => {
     q.status = readStoryboard(id) ? (q.renders?.length ? 'done' : 'review') : readConcepts(id)?.concepts?.length ? 'concepts' : 'brief';
     saveProject(q);
     activityLog(`${id} was ${before} when the studio last stopped; reset to "${q.status}"`, {projectId: id, level: 'warn'});
-    appendLog(id, {kind: 'error', text: `Video Studio stopped while this was ${before} (often the PC ran out of memory). Status reset to "${q.status}"; your files are kept. Start the step again.`});
+    appendLog(id, {kind: 'error', text: `MotionStudio stopped while this was ${before} (often the PC ran out of memory). Status reset to "${q.status}"; your files are kept. Start the step again.`});
     console.log(`  ! ${id}: was ${before} when the studio stopped, reset to ${q.status}`);
   }
 };
@@ -988,18 +1008,19 @@ const recoverStuck = () => {
 const CRASH_LOG = path.join(DATA, 'crash.log');
 const crashed = (kind) => (e) => {
   try { fs.appendFileSync(CRASH_LOG, `${new Date().toISOString()} ${kind}: ${e?.stack ?? e}\n  free RAM ${Math.round(os.freemem() / 2 ** 20)} MB of ${Math.round(os.totalmem() / 2 ** 20)} MB\n`); } catch {}
-  console.error(`\n  Video Studio crashed (${kind}): ${e?.message ?? e}\n`);
+  console.error(`\n  MotionStudio crashed (${kind}): ${e?.message ?? e}\n`);
   process.exit(1);
 };
 process.on('uncaughtException', crashed('uncaughtException'));
 process.on('unhandledRejection', crashed('unhandledRejection'));
 
-const server = app.listen(PORT, (err) => {
+const HOST = process.env.HOST ?? '127.0.0.1'; // this PC only; set HOST=0.0.0.0 to share on the network (the sign-in still applies)
+const server = app.listen(PORT, HOST, (err) => {
   if (err) return; // handled by the 'error' listener below (Express 5 also passes it here)
   // built-in sound effects (*.wav is git-ignored): make them if missing
   if (!fs.existsSync(path.join(REEL, 'public', 'sfx', 'whoosh.wav'))) import('../bin/make-sfx.mjs').catch((e) => console.error('  ! Could not create sound effects:', e.message));
   try { recoverStuck(); } catch (e) { console.error('  ! Could not check for stuck projects:', e.message); }
-  console.log(`\n  MagicBolt Video Studio  ->  ${URL_}\n  Remotion Studio (live preview)  ->  http://localhost:${STUDIO_PORT}\n`);
+  console.log(`\n  MotionStudio by MagicBolt.ai  ->  ${URL_}\n  Remotion Studio (live preview)  ->  http://localhost:${STUDIO_PORT}\n`);
   // Claude runs on this PC's Claude Code login only (API keys are ignored, see agent.mjs). macOS keeps it in the Keychain.
   const creds = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), '.credentials.json');
   const ai = aiConfig();
@@ -1008,7 +1029,7 @@ const server = app.listen(PORT, (err) => {
   else console.log('  Claude: using your local Claude Code login (no API key)\n');
   const swept = sweepBundles(10 * 60 * 1000); // leftover render copies in the temp folder from runs that were killed
   if (swept) activityLog(`Cleared ${swept} old render cop${swept === 1 ? 'y' : 'ies'} from the temp folder (about ${(swept * 0.57).toFixed(1)} GB)`, {level: 'ok'});
-  activityLog(`Video Studio started on ${URL_}`, {level: 'ok'});
+  activityLog(`MotionStudio started on ${URL_}`, {level: 'ok'});
   if (!process.env.NO_REMOTION_STUDIO) {
     activityLog('Starting the Remotion preview server…');
     let previewReady = false;
@@ -1037,7 +1058,7 @@ const server = app.listen(PORT, (err) => {
 // already running (e.g. started from another terminal or VS Code): just open the web view
 server.on('error', (e) => {
   if (e.code !== 'EADDRINUSE') throw e;
-  console.log(`\n  Video Studio is already running -> ${URL_} (opening it)\n`);
+  console.log(`\n  MotionStudio is already running -> ${URL_} (opening it)\n`);
   openBrowser();
   setTimeout(() => process.exit(0), 1500);
 });

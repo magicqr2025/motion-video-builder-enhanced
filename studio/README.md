@@ -1,4 +1,4 @@
-# MagicBolt Video Studio
+# MotionStudio by MagicBolt.ai
 
 A local web app for making Remotion videos with Claude Code. You give the brief in the browser, Claude
 designs concepts as real sample frames, you approve one, and Claude builds the full video with timing
@@ -6,27 +6,49 @@ synced to your voiceover. Then you preview and render the MP4.
 
 Any of these starts the app and opens http://localhost:4321 in your browser (Remotion Studio live preview runs on :3100):
 
-- **Open the folder in VS Code.** `.vscode/tasks.json` auto-runs the "Video Studio" task. VS Code asks once to allow automatic tasks.
+- **Open the folder in VS Code.** `.vscode/tasks.json` auto-runs the "MotionStudio" task. VS Code asks once to allow automatic tasks.
 - `npm run dev` (or `npm start`) in the repo root. The plain Remotion Studio for the root project is now `npm run dev:remotion`.
 - `npm run studio` in `magicbolt-reel/`.
-- Double-click `Video Studio.cmd`.
+- Double-click `MotionStudio.cmd`.
 
 If the app is already running, starting it again just opens the browser tab. First time only: `cd studio && npm install`.
 
 The app uses your existing Claude Code login, so it needs no API key. Usage counts against your Claude plan.
 It only ever uses that local login: `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` and other provider variables are
-stripped before Claude starts, and the studio stores no credentials of its own. Not signed in? Run `claude` and `/login`.
+stripped before Claude starts, and the studio keeps no AI credentials. Not signed in? Run `claude` and `/login`.
 
-### Other AI models
+### Starting it as a program (MotionStudio.exe)
 
-Open **AI model** at the top of the home page to pick who does the work: Claude Code (default), OpenAI, Google Gemini,
-OpenRouter, Ollama (local) or any other OpenAI-compatible API. Set the model id and paste an API key (or use
-`OPENAI_API_KEY` / `GEMINI_API_KEY` / `OPENROUTER_API_KEY`), then **Test connection**. The key stays on this PC in
-`studio/data/settings.json`.
+`MotionStudio.exe` in the repo root is a small launcher. Double-click it and it starts the studio in the background, opens
+it in a full-screen Chrome or Edge window and, when you close that window, stops the studio again (if a render or an AI
+task is still running it waits until that is done). It needs Node.js on the PC. The first start installs the packages.
+Press F11 to leave full screen, or use the power icon at the top right to quit.
 
-Other models get the same prompts and tools (read and look at images, write, edit, shell, find, search) and the
-same safety rules as Claude. The model must support tool calling, and vision to check rendered frames. Weaker or small
-local models will struggle with full builds. Each project keeps its own conversation in `data/<project>/agent-session.json`.
+Rebuild it after changing `launcher/MotionStudio.cs`: run `launcher/build-exe.cmd` (uses the C# compiler that ships with Windows).
+The exe must stay next to the `studio` folder.
+
+### Signing in
+
+MotionStudio asks for an admin login before it shows anything. There is no sign-up page: admins are kept in
+`studio/admins.json` and added from the command line, each with an expiry date. After the expiry date that admin can no
+longer sign in, and removing or disabling an admin signs them out straight away. Passwords are saved as salted
+hashes, never as text.
+
+```
+node studio/bin/admin.mjs add priya --name "Priya Shah" --days 180        (password is generated and shown once)
+node studio/bin/admin.mjs add rahul "My-Password-1" --expires 2027-03-31
+node studio/bin/admin.mjs list
+node studio/bin/admin.mjs expire priya --expires 2027-12-31               (or --days 90 from today)
+node studio/bin/admin.mjs passwd priya                                     (new password; or give one)
+node studio/bin/admin.mjs disable priya        enable priya        remove priya
+```
+
+The server listens on this PC only (`127.0.0.1`). Five wrong passwords lock that username for a minute.
+
+### AI
+
+MotionStudio always uses the Claude Code login on this PC: there is no provider to choose and nothing to connect.
+The model for building videos can be picked under **AI** on the home page.
 
 ## Flow
 
@@ -106,7 +128,8 @@ The studio's videos also appear in the normal Remotion Studio (`magicbolt-reel`,
 
 ## Settings (environment variables)
 
-- `PORT`: app port (default 4321)
+- `PORT`: app port (default 4321). The launcher exe expects 4321.
+- `HOST`: address to listen on (default `127.0.0.1`, this PC only; `0.0.0.0` shares it on the network, the sign-in still applies)
 - `REMOTION_STUDIO_PORT`: live preview port (default 3100)
 - `STUDIO_MODEL`: Claude model for the agent (default is your Claude Code default)
 - `NO_REMOTION_STUDIO=1`: don't start the live preview

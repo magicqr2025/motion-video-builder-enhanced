@@ -48,3 +48,16 @@ html[data-theme="dark"] .icon-btn .ic-sun { display: block; }
 .icon-btn.is-fs .ic-expand { display: none; }
 .icon-btn.is-fs .ic-compress { display: block; }
 html[data-theme="dark"] .icon-btn:hover { background: #262626; color: #e0e0e0; border-color: #3a3a3a; }
+
+/* brand, signed-in chip */
+.brand-tx { display: grid; line-height: 1.1; }
+.brand-tx b { font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+.brand-tx small { font-size: 10.5px; font-weight: 400; color: var(--muted); letter-spacing: .02em; margin-top: 2px; }
+.user-chip { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px 3px 4px; border-radius: 99px; border: 1px solid var(--line); background: transparent; margin-right: 4px; }
+.uc-av { width: 28px; height: 28px; border-radius: 50%; background: var(--navy); color: #fff; font-style: normal; font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.uc-tx { display: grid; line-height: 1.15; }
+.uc-tx b { font-size: 12px; font-weight: 500; }
+.uc-tx small { font-size: 10.5px; color: var(--muted); }
+.user-chip.soon { border-color: #f1d9a8; }
+.user-chip.soon small { color: #b5791b; }
+@media (max-width: 900px) { .uc-tx { display: none; } .user-chip { padding: 3px; } }

@@ -1,0 +1,13 @@
+{
+  "_help": "Copy to admins.json is not needed: run  node studio/bin/admin.mjs add <username>  and the file is created. Each admin has passwordHash (salted scrypt, never the password), expiresAt (YYYY-MM-DD) and disabled. admins.json is git-ignored on purpose.",
+  "admins": [
+    {
+      "username": "example",
+      "name": "Example Admin",
+      "passwordHash": "(created by admin.mjs)",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "expiresAt": "2027-01-01",
+      "disabled": true
+    }
+  ]
+}

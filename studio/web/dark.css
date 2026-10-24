@@ -338,6 +338,9 @@ html[data-theme="dark"] .top-link:hover { background: #282626; color: #cfcfcf; }
 html[data-theme="dark"] .top-link.on { background: #272525; border-color: #333030; color: #cecaca; }
 html[data-theme="dark"] .icon-btn:hover { background: #282626; color: #cfcfcf; border-color: #333030; }
 html[data-theme="dark"] html[data-theme="dark"] .icon-btn:hover { background: #272525; color: #c7c7c7; border-color: #3c3838; }
+html[data-theme="dark"] .uc-av { color: #e3e3e3; }
+html[data-theme="dark"] .user-chip.soon { border-color: #534527; }
+html[data-theme="dark"] .user-chip.soon small { color: #e2b56f; }
 
 /* from brief.css */
 html[data-theme="dark"] .pill.ai { background: linear-gradient(90deg, #272525, #272525); color: #cecaca; border: 1px solid #333131; }
@@ -415,3 +418,10 @@ html[data-theme="dark"] .tasks li.next { background: #3a2d13; color: #e6c26a; }
 html[data-theme="dark"] .tasks li.next small { color: #e0b770; }
 html[data-theme="dark"] .tasks-now { background: #292626; border: 1px solid #333030; color: #cecaca; }
 html[data-theme="dark"] .tasks-ai li.in_progress { color: #cecaca; }
+
+/* from login.css */
+html[data-theme="dark"] .lg-bolt { background: linear-gradient(145deg, #706a6a, #4d4949); }
+html[data-theme="dark"] html[data-theme="dark"] .lg-bolt { background: linear-gradient(145deg, #4c4848, #2d2b2b); }
+html[data-theme="dark"] .lg-bolt svg { fill: #f5d25c; }
+html[data-theme="dark"] .lg-f input:focus { border-color: #444040; }
+html[data-theme="dark"] .lg-pw button:hover { background: rgba(128, 128, 128, .12); }
