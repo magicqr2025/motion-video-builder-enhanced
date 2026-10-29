@@ -1,0 +1,8 @@
+/* Motion & layouts picker and "borrow from this reference" chips */
+.motion-lib { gap: 14px; }
+.mgroup { display: grid; gap: 8px; }
+.mgt { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mgt small { color: var(--slate); font-size: 12px; }
+.borrow { display: grid; gap: 6px; margin: 4px 0; }
+.borrow > .muted { font-size: 12px; }
+.borrow .mood { font-size: 11px; padding: 3px 9px; }

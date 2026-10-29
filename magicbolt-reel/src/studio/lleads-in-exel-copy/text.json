@@ -1,0 +1,23 @@
+{
+  "Hook": {"line1": "Are your leads also", "line2": "resting in Excel", "line3": "sheets?", "sheet": "leads.xlsx", "rows": ["Rahul S.", "Priya M.", "Amit K.", "Neha R.", "Vikas T."], "status": "No follow-up"},
+  "Ads": {"headline": "You spend money on ads", "lead": "New lead · Rahul S.", "leadSub": "From a Facebook ad", "call": "Call · talked once", "callSub": "00:42", "ended": "Call ended", "after": "And that's the end of it"},
+  "FollowUp": {"intro": "But the truth is", "line": "A lead often needs", "suffix": "+", "follow": "follow-ups to convert", "steps": ["Call", "Follow-up 2", "Follow-up 3", "Follow-up 4"], "once": "After one conversation", "retarget": "Retarget", "cant": "you can't retarget them"},
+  "Example": {"intro": "Let's take an example", "title": "You ran an ad →", "ad": "Ad running", "count": "Leads came in", "converted": "Converted", "wasted": "Wasted", "money": "But you paid for all 10"},
+  "Waste": {"question": "The other 7?", "excel": "Sitting in Excel", "phone": "In a staff member's phone", "waste": "Money simply wasted"},
+  "Solution": {"problem": "This is the problem it solves", "brand": "Way CRM", "sub": "Complete AI Automation Software", "n1": "WhatsApp automation", "n1sub": "Nurtures new leads instantly", "n2": "AI calling agents", "n2sub": "Right pitch, converted", "n3": "Sales pipeline", "n3sub": "Retarget in the future"},
+  "Features": {
+    "f1": "WhatsApp Automation", "f1sub": "New lead managed + nurtured instantly",
+    "f2": "AI Calling Agents", "f2sub": "Converts with the right pitch",
+    "f3": "Complete Sales Pipeline", "f3sub": "No reply? The lead stays safe",
+    "f4": "Future Retargeting", "f4sub": "Reach every lead again",
+    "stages": ["New", "Nurture", "AI Call", "Won"],
+    "n1": "WhatsApp · Hi Rahul!", "n1sub": "Auto reply in 2 sec",
+    "n2": "AI Call · Priya M.", "n2sub": "Interested → Demo booked",
+    "n3": "Pipeline · Amit K.", "n3sub": "Moved to Nurture",
+    "toggle": "Retarget on",
+    "chat": {"name": "Rahul S.", "status": "Way CRM auto-reply · online", "msgs": ["Hi, what's the price?", "Hi Rahul! Welcome to Way CRM", "Here are the details + demo link", "Please book a demo", "Done! Tomorrow 11 AM confirmed"]}
+  },
+  "Result": {"question": "The result?", "conv": "More conversions", "suffix": "x", "line": "Chance to grow sales & revenue", "team": "A productive team", "cta": "Visit today", "site": "waycrm.in", "by": "Way CRM by"},
+  "End": {"brand": "Way CRM", "by": "by MagicBolt AI", "cta": "Visit today", "site": "waycrm.in"},
+  "_help": {"Hook.line2": "max ~18 chars", "Solution.brand": "product name", "End.site": "website shown on the CTA", "Features.stages": "4 short pipeline stages"}
+}

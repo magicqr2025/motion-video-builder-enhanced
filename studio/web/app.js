@@ -1,9 +1,12 @@
 // MotionStudio by MagicBolt.ai: browser side. Plain JS modules, no build step.
 import {initTools, renderTools, toolsChanged} from './tools.js';
 import {initStorage, renderStorage} from './storage.js';
+import {initLibrary, renderLibrary, libraryChanged} from './library.js';
+import {initDecks, renderDecks} from './decks.js';
 import {initReview, reviewHtml, reviewEditing} from './review.js';
 import {initFiles} from './files.js';
 import {initStory, storyHTML, renderStory, storyRunning, stopStoryRun, aiFilled, usageHTML} from './story.js';
+import {initVoice, renderVoice, stripTags} from './voice.js';
 import {initActivity, onServerEvent, note, setConnection, refreshContext} from './activity.js';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -80,6 +83,8 @@ const route = () => {
   const [, kind, id, tab] = location.hash.split('/');
   if (kind === 'tools') return {id: null, tools: true};
   if (kind === 'storage') return {id: null, storage: true};
+  if (kind === 'library') return {id: null, library: true};
+  if (kind === 'ppt') return {id: null, ppt: true};
   return kind === 'p' && id ? {id, tab: tab || null} : {id: null};
 };
 const go = (id, tab) => { location.hash = id ? `#/p/${id}/${tab ?? ''}` : '#/'; };
@@ -105,6 +110,8 @@ const load = async () => {
   await loadState().catch((e) => toast(e.message));
   if (r.tools) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Video tools</b> · video to script &amp; MP3'; note('Opened Video tools.', {projectId: null}); await renderTools(); refreshContext(); return; }
   if (r.storage) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Storage</b> · files and clean-up'; note('Opened Storage.', {projectId: null}); await renderStorage(); refreshContext(); return; }
+  if (r.ppt) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Visual PPT</b> · browser slide decks'; note('Opened Visual PPT.', {projectId: null}); await renderDecks(); refreshContext(); return; }
+  if (r.library) { S.cur = null; $('#chat').hidden = true; $('#crumbs').innerHTML = '<b>Library</b> · all your videos'; note('Opened the Library.', {projectId: null}); await renderLibrary(); refreshContext(); return; }
   if (!r.id) { S.cur = null; note('Opened the home page.', {projectId: null}); renderHome(); renderChat(); refreshContext(); return; }
   try { await loadProject(r.id); } catch { note(`Could not open video “${r.id}” (it no longer exists). Going home.`, {level: 'warn', projectId: null}); go(null); return; }
   S.tab = r.tab || bestTab(S.cur.project);
@@ -119,6 +126,9 @@ const renderSide = () => {
   const r = route();
   $('#tools-link')?.classList.toggle('on', !!r.tools);
   $('#storage-link')?.classList.toggle('on', !!r.storage);
+  $('#library-link')?.classList.toggle('on', !!r.library);
+  $('#ppt-link')?.classList.toggle('on', !!r.ppt);
+  const lc = $('#lib-count'); if (lc) lc.textContent = `${S.state.projects.length} video${S.state.projects.length === 1 ? '' : 's'}`;
   const all = S.state.projects, STEP = 8;
   S.sideLimit ??= STEP;
   // the open video always stays in the list, even when it is beyond the current page
@@ -178,7 +188,7 @@ const aiCard = () => {
 const renderHome = () => {
   $('#crumbs').innerHTML = '';
   $('#chat').hidden = true;
-  const ps = S.state.presets;
+  const ps = S.state.presets.filter((x) => !x.hidden);
   const cats = [...new Set(ps.map((p) => p.category))];
   $('#main').innerHTML = `
     <div class="hero">
@@ -218,18 +228,70 @@ const headMeta = (p, sb) => {
 const tabEnabled = (t, p, cur) => !(S.plannerBusy && t === 'brief') && (t === 'script' || t === 'brief' || t === 'look' || (t === 'concepts' && (cur.concepts || p.status !== 'brief')) || (t === 'build' && (cur.storyboard || cur.resumable || ['building', 'review', 'rendering', 'done'].includes(p.status))) || ((t === 'render' || t === 'text' || t === 'audio' || t === 'background' || t === 'style') && cur.storyboard));
 const tabDone = (t, p) => ({brief: p.status !== 'brief', look: !!p.look?.reviewed, concepts: !!p.approvedConcept, build: !!p.approval, text: false, style: false, audio: false, background: false, render: p.renders.length > 0}[t]);
 
+// ---------- duplicate and adapt ----------
+const BRIEF_DIFF_LABELS = {idea: 'idea', audience: 'audience', cta: 'call to action', language: 'language', script: 'script', onScreen: 'on-screen text', durationSec: 'length', colors: 'colours', style: 'style', captions: 'captions', notes: 'notes', brandId: 'brand'};
+// what differs between the brief now and what the video was built from (a duplicate remembers the brief it was copied with)
+const briefDiff = (p, sb) => {
+  const out = [], from = p.duplicatedFrom?.brief, b = p.brief;
+  const bw = sb?.width || from?.width, bh = sb?.height || from?.height, bf = sb?.fps || from?.fps;
+  if (bw && bh && (bw !== b.width || bh !== b.height)) out.push(`size ${bw}×${bh} → ${b.width}×${b.height}`);
+  if (bf && bf !== b.fps) out.push(`${bf} → ${b.fps} fps`);
+  if (from) for (const [k, l] of Object.entries(BRIEF_DIFF_LABELS)) if (JSON.stringify(from[k] ?? null) !== JSON.stringify(b[k] ?? null)) out.push(l);
+  return out;
+};
+const adaptBanner = (p, sb, busy) => {
+  if (busy || !sb) return '';
+  const diff = briefDiff(p, sb), dup = p.duplicatedFrom;
+  if (!diff.length) return '';
+  return `<div class="adapt-banner"><div><b>${dup ? `Copy of “${esc(dup.title)}”: ` : ''}the brief no longer matches the built video</b><div class="small muted">Changed: ${esc(diff.join(' · '))}. Claude keeps the concept, copy, timing and voiceover and adapts the scenes${diff.some((x) => x.startsWith('size')) ? ' to the new size' : ''}.</div></div>
+    <input id="adapt-notes" placeholder="anything else to change? (optional)" /><button class="btn gold sm" data-action="adapt-now">Adapt with Claude</button></div>`;
+};
+const dupSizes = (p) => {
+  const same = SIZES.some(([, w, h]) => w === p.brief.width && h === p.brief.height);
+  return same ? SIZES : [[`Same ${p.brief.width}×${p.brief.height}`, p.brief.width, p.brief.height], ...SIZES];
+};
+const openDuplicate = () => {
+  const {project: p} = S.cur;
+  $('#dup-dialog')?.remove();
+  const d = document.createElement('dialog');
+  d.id = 'dup-dialog'; d.dataset.size = `${p.brief.width}x${p.brief.height}`;
+  const sizes = dupSizes(p);
+  d.innerHTML = `<div class="dup-box">
+    <h2>Duplicate this video</h2>
+    <p class="muted small">Makes a full working copy: brief, media, concept, scenes, text, audio and look. “${esc(p.title)}” is not touched. The copy opens with everything filled in, so you only change what you need.</p>
+    <label class="fl">Name</label><input id="dup-title" value="${esc(`${p.title} (copy)`)}" />
+    <label class="fl" style="margin-top:14px">Size of the copy</label>
+    <div class="size-grid" id="dup-sizes">${sizes.map(([l, w, h]) => { const k = 30, bw = w >= h ? k : Math.max(10, Math.round(k * w / h)), bh = h >= w ? k : Math.max(10, Math.round(k * h / w)); const on = w === p.brief.width && h === p.brief.height; return `<button type="button" class="size-card ${on ? 'on' : ''}" data-dup-size="${w}x${h}"><span class="ar-box"><i style="width:${bw}px;height:${bh}px"></i></span><b>${esc(l.split(' ')[0])}</b><small>${esc(l.split(' ').slice(1).join(' '))} · ${w}×${h}</small></button>`; }).join('')}</div>
+    <label class="fl" style="margin-top:14px">What should change? (optional)</label>
+    <textarea id="dup-notes" rows="3" placeholder="e.g. Make it for YouTube. Shorter intro, new CTA, bigger text."></textarea>
+    <div class="dup-actions">
+      <button class="btn ghost" data-action="dup-cancel">Cancel</button>
+      <button class="btn" data-action="dup-go" data-adapt="0" title="Only copies. Open the copy, edit the Brief, then press Adapt with Claude when you are ready.">Duplicate only</button>
+      <button class="btn gold" data-action="dup-go" data-adapt="1" title="Copies, then Claude re-lays out the scenes for the new size and applies your notes. Uses your Claude plan.">Duplicate &amp; adapt with Claude</button>
+    </div>
+    <p class="muted small" style="margin:10px 0 0">Duplicate only costs nothing. Adapt with Claude is one request on your Claude plan; it resizes and applies the changes without redesigning.</p>
+  </div>`;
+  document.body.append(d); d.showModal();
+  d.addEventListener('close', () => d.remove());
+  $('#dup-title', d).select();
+};
+
+// small "AI" badge on a step the AI has worked on in this video
+const aiBadge = (at) => at ? `<i class="ai-badge" title="The AI worked on this step${isNaN(Date.parse(at)) ? '' : ` (${esc(new Date(at).toLocaleString())})`}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l2.6 7.4 7.4 2.6-7.4 2.6L12 21.5l-2.6-7.4L2 11.5l7.4-2.6z"/></svg>AI</i>` : '';
+
 const renderProject = () => {
   const {project: p} = S.cur;
   const [label, tone] = STATUS[p.status] ?? [p.status, ''];
   const preset = S.state.presets.find((x) => x.id === p.presetId);
   $('#crumbs').innerHTML = `<b>${esc(p.title)}</b> · ${esc(preset?.name ?? 'Blank')} · ${p.brief.width}×${p.brief.height}`;
   $('#chat').hidden = false;
-  const tabs = TABS.map(([k, l], i) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''} ${tabDone(k, p) ? 'done' : ''}" ${tabEnabled(k, p, S.cur) ? '' : 'disabled'}><span class="k">${tabDone(k, p) ? '✓' : i + 1}</span>${l}</button>`).join('');
+  const tabs = TABS.map(([k, l], i) => `<button data-tab="${k}" class="${S.tab === k ? 'on' : ''} ${tabDone(k, p) ? 'done' : ''}" ${tabEnabled(k, p, S.cur) ? '' : 'disabled'}><span class="k">${tabDone(k, p) ? '✓' : i + 1}</span>${l}${aiBadge(p.aiSteps?.[k])}</button>`).join('');
   $('#main').innerHTML = `
     <div class="spread">
       <div class="row"><h1 style="font-size:24px">${esc(p.title)}</h1><span class="pill ${tone}">${S.cur.busy ? '<i class="dot"></i>' : ''}${esc(label)}</span>${headMeta(p, S.cur.storyboard)}<button class="btn sm stop-all" id="head-stop" data-action="stop-all" title="Stop everything running for this video (stops AI usage and renders)" hidden>■ Stop</button></div>
-      <div class="row"><span class="muted small" title="${p.tokens ? esc(`Written ${kTok(p.tokens.output)} · new input ${kTok((p.tokens.input ?? 0) + (p.tokens.cacheWrite ?? 0))} · re-read from cache ${kTok(p.tokens.cacheRead ?? 0)}`) : ''}">${p.cost ? `usage ≈ $${p.cost.toFixed(2)}` : ''}${p.tokens ? `${p.cost ? ' · ' : 'usage '}${kTok((p.tokens.input ?? 0) + (p.tokens.output ?? 0) + (p.tokens.cacheWrite ?? 0))} tokens` : ''}</span><button class="btn ghost sm danger" data-action="delete">Delete</button></div>
+      <div class="row"><span class="muted small" title="${p.tokens ? esc(`Written ${kTok(p.tokens.output)} · new input ${kTok((p.tokens.input ?? 0) + (p.tokens.cacheWrite ?? 0))} · re-read from cache ${kTok(p.tokens.cacheRead ?? 0)}`) : ''}">${p.cost ? `usage ≈ $${p.cost.toFixed(2)}` : ''}${p.tokens ? `${p.cost ? ' · ' : 'usage '}${kTok((p.tokens.input ?? 0) + (p.tokens.output ?? 0) + (p.tokens.cacheWrite ?? 0))} tokens` : ''}</span><button class="btn ghost sm" data-action="duplicate" title="Make a full working copy of this video: brief, media, concept, scenes, text and audio. Change the size or anything else, then build.">⧉ Duplicate</button><button class="btn ghost sm danger" data-action="delete">Delete</button></div>
     </div>
+    ${adaptBanner(p, S.cur.storyboard, S.cur.busy)}
     <div class="tabs">${tabs}</div>
     <div id="tab"></div>`;
   syncHeadStop();
@@ -282,17 +344,18 @@ const field = (name, label, value, {type = 'text', rows, placeholder = '', hint 
 const select = (name, label, value, opts) => `<label class="f"><span>${label}</span><select name="${name}">${opts.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o || '(preset default)']; return `<option value="${esc(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select></label>`;
 
 initStory({S, api: (...a) => api(...a), toast: (...a) => toast(...a), field, select, LANGS, flushSave: () => flushSave(), setBrief: (...a) => setBrief(...a), aiTag, onBusy: () => syncHeadStop(), onChange: () => updateRail(), onFilled: () => renderProject()});
+initVoice({S, api: (...a) => api(...a), toast: (...a) => toast(...a), flushSave: () => flushSave()});
 const OUT_FORMATS = [['mp4', 'MP4', 'video with sound'], ['gif', 'GIF', 'loops · no sound'], ['webp', 'WebP', 'animated · no sound']];
 const ANIM_SIZES = [[480, 'Small', '480 px'], [720, 'Medium', '720 px'], [1080, 'Large', '1080 px']];
 const ANIM_FPS_OPTS = [[10, '10 fps', 'smallest'], [15, '15 fps'], [24, '24 fps', 'smoothest']];
 const outFmt = (b) => (OUT_FORMATS.some((o) => o[0] === b.outputFormat) ? b.outputFormat : 'mp4');
 const outputPicker = (b) => {
-  const f = outFmt(b), anim = f !== 'mp4', secs = Number(b.durationSec) || Math.round(((String(b.script ?? '').trim().match(/\S+/g) ?? []).length) / 2.5);
+  const f = outFmt(b), anim = f !== 'mp4', secs = Number(b.durationSec) || Math.round(((stripTags(b.script).match(/\S+/g) ?? []).length) / 2.5);
   return `${optField('Output format', optGroup('data-outfmt', f, OUT_FORMATS), f === 'mp4' ? 'Best quality, with sound. Use for YouTube, Instagram, WhatsApp and ads.' : f === 'gif' ? 'Works everywhere, even in email and chat. Large files and 256 colours, so keep it short.' : 'Smaller and sharper than GIF. Works in browsers, WhatsApp and most apps.', 'outputFormat')}
     ${anim ? `<div class="anim-opts">${optField('Animation size', optGroup('data-animw', Number(b.animWidth) || 480, ANIM_SIZES))}${optField('Animation frame rate', optGroup('data-animfps', Number(b.animFps) || 15, ANIM_FPS_OPTS))}
       ${secs > 20 ? `<div class="st-note" style="grid-column:1/-1">This is about ${secs} seconds long. ${f.toUpperCase()}s that long make very large files. Under 15 seconds works best, or use MP4.</div>` : ''}</div>` : ''}`;
 };
-const BSECS = [['basics', 1, 'Basics'], ['story', 2, 'Story'], ['format', 3, 'Format'], ['look', 4, 'Look'], ['media', 5, 'Media']];
+const BSECS = [['basics', 1, 'Basics'], ['story', 2, 'Story'], ['format', 3, 'Format'], ['look', 4, 'Look'], ['motion', 5, 'Motion'], ['media', 6, 'Media']];
 const bsecFolded = (k) => { try { return localStorage.getItem(`studio-bsec-${k}`) === '1'; } catch { return false; } };
 const bsec = (key, n, title, sub, summary, body) => `
   <section class="bsec ${bsecFolded(key) ? 'folded' : ''}" data-bsec="${key}" id="bsec-${key}">
@@ -300,7 +363,7 @@ const bsec = (key, n, title, sub, summary, body) => `
     <div class="bsec-body">${body}</div>
   </section>`;
 const storySummary = (b, p) => {
-  const n = (String(b.script ?? '').trim().match(/\S+/g) ?? []).length;
+  const n = (stripTags(b.script).match(/\S+/g) ?? []).length;
   if (!n) return 'not started';
   return b.scriptState === 'review' ? `script in review · ${n} words` : (b.scriptState === 'approved' || (b.scriptState === undefined && p.status !== 'brief')) ? `script approved · ${n} words` : `${n} words`;
 };
@@ -340,7 +403,7 @@ const briefActions = () => {
 };
 const railHTML = () => {
   const {project: p} = S.cur, b = p.brief, items = readiness(), req = items.filter((i) => i[3] !== 'optional'), done = req.filter((i) => i[1]).length, pct = Math.round(done / req.length * 100);
-  const words = (String(b.script ?? '').trim().match(/\S+/g) ?? []).length, size = SIZES.find(([, w, h]) => w === b.width && h === b.height);
+  const words = (stripTags(b.script).match(/\S+/g) ?? []).length, size = SIZES.find(([, w, h]) => w === b.width && h === b.height);
   const brand = S.state.brands.find((x) => x.id === b.brandId);
   const stat = (k, v) => `<div class="rs"><span>${k}</span><b>${v}</b></div>`;
   return `
@@ -380,11 +443,11 @@ const renderBrief = () => {
       ${bsec('basics', 1, 'Basics', 'name, preset and brand', `${esc(p.title)}`, `
       <div class="card grid g3">
         ${field('title', 'Video title', p.title, {placeholder: 'e.g. White label setup in 3 steps'})}
-        ${select('presetId', 'Preset (reusable look)', p.presetId ?? '', [['', 'Blank (no preset)'], ...S.state.presets.map((x) => [x.id, x.name])])}
+        ${select('presetId', 'Preset (reusable look)', p.presetId ?? '', [['', 'Blank (no preset)'], ...S.state.presets.filter((x) => !x.hidden || x.id === p.presetId).map((x) => [x.id, x.name])])}
         ${select('brandId', 'Brand kit', b.brandId, [...brands.map((x) => [x.id, x.name]), ['custom', 'Custom colours']])}
       </div>`)}
 
-      ${bsec('story', 2, 'Story', 'start from an idea or a script', storySummary(b, p), '<div class="card st-card" id="story-card"></div>')}
+      ${bsec('story', 2, 'Story', 'start from an idea or a script', storySummary(b, p), '<div class="card st-card" id="story-card"></div><div class="card vo-card" id="voice-card"></div>')}
 
       ${bsec('format', 3, 'Format', 'size, frame rate, length and output', `${b.width}×${b.height} · ${b.fps} fps · ${outFmt(b).toUpperCase()}`, `
       <div class="card stack">
@@ -409,9 +472,11 @@ const renderBrief = () => {
         ${optField('Captions', optGroup('data-caption', b.captions ?? '', CAPTIONS.map((c) => [c, c || 'Preset default'])), '', 'captions')}
       </div>`)}
 
-      ${bsec('media', 5, 'Media & references', 'voiceover, music, logo, images, footage, reference videos', `${p.assets.length} file${p.assets.length === 1 ? '' : 's'}`, `
+      ${bsec('motion', 5, 'Motion & layouts', 'pick effects and layouts by name', `${(b.effects ?? []).length ? `${b.effects.length} picked` : 'AI decides'}`, motionPickerHTML(b))}
+
+      ${bsec('media', 6, 'Media & references', 'voiceover, music, logo, images, footage, reference videos', `${p.assets.length} file${p.assets.length === 1 ? '' : 's'}`, `
       <div class="card">
-        <div class="drop" id="drop"><b>Drop files here</b> or click to upload<div class="small muted" style="margin-top:4px">Voiceovers are transcribed for timing · reference videos are turned into frames Claude can study</div></div><input type="file" id="file" multiple hidden />
+        <div class="drop" id="drop"><b>Drop files here</b> or click to upload<div class="small muted" style="margin-top:4px">Voiceovers are transcribed for timing · set a file to “reference” and tick what to borrow (transitions, text, layout…) · videos become frames Claude can study</div></div><input type="file" id="file" multiple hidden />
         <div class="assets" id="assets"></div>
       </div>
       <div class="card grid g2" style="margin-top:16px">
@@ -428,8 +493,25 @@ const renderBrief = () => {
       </div>
     </form>`;
   $('#story-card').innerHTML = storyHTML();
+  renderVoice();
   updateRail();
   renderAssets();
+};
+
+// ---------- motion library: pick named effects / layouts; tag references with what to borrow ----------
+const motionPickerHTML = (b) => {
+  const cat = S.state.catalog ?? {categories: [], items: []}, picks = new Set(b.effects ?? []);
+  if (!cat.items.length) return '<div class="card muted">The motion library is empty.</div>';
+  return `<div class="card stack motion-lib">
+    <div class="small muted">Optional. Tick the effects and layouts you want and Claude uses exactly those. Leave a group empty to let Claude choose. Reference videos and images you upload below can add more: tag them with what to borrow.</div>
+    ${cat.categories.map((c) => `<div class="mgroup"><div class="mgt"><b>${esc(c.title)}</b><small>${esc(c.hint)}</small></div>
+      <div class="moods">${cat.items.filter((i) => i.cat === c.id).map((i) => `<button type="button" class="mood ${picks.has(i.id) ? 'on' : ''}" data-effect="${esc(i.id)}" title="${esc(i.desc)}">${esc(i.name)}</button>`).join('')}</div></div>`).join('')}
+    <div class="row"><button type="button" class="btn ghost sm" data-action="effects-clear" ${picks.size ? '' : 'disabled'}>Clear picks</button></div>
+  </div>`;
+};
+const borrowChips = (a) => {
+  const cats = S.state.catalog?.categories ?? [], on = new Set(a.borrow ?? []);
+  return `<div class="borrow"><span class="muted">Borrow from this:</span><div class="moods">${cats.map((c) => `<button type="button" class="mood ${on.has(c.id) ? 'on' : ''}" data-borrow="${esc(a.file)}" data-cat="${esc(c.id)}" title="${esc(c.hint)}">${esc(c.title)}</button>`).join('')}</div></div>`;
 };
 
 const renderAssets = () => {
@@ -443,10 +525,11 @@ const renderAssets = () => {
     const job = S.jobText[a.file] && a.job ? `${a.job} · ${S.jobText[a.file]}` : a.job;
     const badges = [a.transcript && `<span class="pill green">transcribed · ${a.words} words</span>`, a.refDir && '<span class="pill green">frames ready</span>', job && `<span class="pill blue"><i class="dot"></i>${esc(job)}</span>`, a.jobError && `<span class="pill red" title="${esc(a.jobError)}">${esc(a.jobError.slice(0, 40))}</span>`].filter(Boolean).join('');
     return `<div class="asset"><div class="pv">${pv}</div><div class="meta">
-      <div class="spread"><div class="name" title="${esc(a.original)}">${esc(a.original)}</div>${a.role === 'reference' ? '' : `<button type="button" class="btn ghost sm" data-action="rm-asset" data-file="${esc(a.file)}" title="Remove">✕</button>`}</div>
+      <div class="spread"><div class="name" title="${esc(a.original)}">${esc(a.original)}</div>${a.role === 'reference' && a.kind === 'video' ? '' : `<button type="button" class="btn ghost sm" data-action="rm-asset" data-file="${esc(a.file)}" title="Remove">✕</button>`}</div>
       <div class="row"><select data-role="${esc(a.file)}">${ROLES.map((r) => `<option ${r === a.role ? 'selected' : ''}>${r}</option>`).join('')}</select><span class="muted">${info}</span></div>
       ${badges ? `<div class="row">${badges}</div>` : ''}
-      <input placeholder="note for Claude (optional)" value="${esc(a.note ?? '')}" data-note="${esc(a.file)}" style="padding:5px 8px;font-size:12px;border-radius:8px" />
+      ${a.role === 'reference' && (a.kind === 'video' || a.kind === 'image') ? borrowChips(a) : ''}
+      <input placeholder="${a.role === 'reference' ? 'what should Claude copy from this? e.g. the zoom-through transition at 0:04' : 'note for Claude (optional)'}" value="${esc(a.note ?? '')}" data-note="${esc(a.file)}" style="padding:5px 8px;font-size:12px;border-radius:8px" />
     </div></div>`;
   }).join('');
 };
@@ -1005,7 +1088,7 @@ const refresh = (full = true) => {
   clearTimeout(refreshTimer);
   refreshTimer = setTimeout(async () => {
     await loadState().catch(() => {});
-    if (!S.cur) { if (!route().id && !route().tools) renderHome(); return; }
+    if (!S.cur) { const r = route(); if (r.library) libraryChanged(); else if (!r.id && !r.tools && !r.storage && !r.ppt) renderHome(); return; }
     await loadProject(S.cur.project.id).catch(() => {});
     if (!full) return renderChat();
     const editing = (S.tab === 'brief' && document.activeElement?.closest?.('#brief')) || (S.tab === 'text' && S.textDirty) || (S.tab === 'audio' && S.audioDirty) || (S.tab === 'background' && document.activeElement?.closest?.('#bgform')) || (S.tab === 'style' && document.activeElement?.closest?.('#style-request, #styleform')) || (S.tab === 'build' && reviewEditing());
@@ -1046,6 +1129,8 @@ es.onmessage = (m) => {
 
 initTools({api, toast});
 initStorage({api, toast});
+initLibrary({api, toast});
+initDecks({api, toast});
 initFiles({api, toast, reload: async () => { await loadProject(S.cur.project.id); renderProject(); renderChat(); }});
 initReview({S: () => S, api, toast, esc, fmtT, bust, liveBox, rerender: () => renderBuild(), reload: async () => { await loadProject(S.cur.project.id); renderProject(); renderChat(); }});
 
@@ -1102,6 +1187,22 @@ document.addEventListener('click', async (ev) => {
   if (durBtn) { setBrief('durationSec', durBtn.dataset.dur === '' ? null : Number(durBtn.dataset.dur)); renderBrief(); return; }
   const capBtn = ev.target.closest('[data-caption]');
   if (capBtn) { setBrief('captions', capBtn.dataset.caption); renderBrief(); return; }
+  const fxBtn = ev.target.closest('[data-effect]');
+  if (fxBtn) {
+    const set = new Set(S.cur.project.brief.effects ?? []), id = fxBtn.dataset.effect;
+    set.has(id) ? set.delete(id) : set.add(id);
+    setBrief('effects', [...set]); fxBtn.classList.toggle('on', set.has(id));
+    const sum = document.querySelector('#bsec-motion .bsum'); if (sum) sum.textContent = set.size ? `${set.size} picked` : 'AI decides';
+    const clr = document.querySelector('[data-action="effects-clear"]'); if (clr) clr.disabled = !set.size; return;
+  }
+  const bwBtn = ev.target.closest('[data-borrow]');
+  if (bwBtn) {
+    const a = S.cur.project.assets.find((x) => x.file === bwBtn.dataset.borrow); if (!a) return;
+    const set = new Set(a.borrow ?? []), c = bwBtn.dataset.cat;
+    set.has(c) ? set.delete(c) : set.add(c);
+    a.borrow = [...set]; bwBtn.classList.toggle('on', set.has(c));
+    await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(a.file)}`, {method: 'PATCH', body: {borrow: a.borrow}}); return;
+  }
   const moodBtn = ev.target.closest('[data-mood]');
   if (moodBtn) {
     const list = moodList(S.cur.project.brief.style), m = moodBtn.dataset.mood, i = list.findIndex((x) => x.toLowerCase() === m.toLowerCase());
@@ -1110,6 +1211,8 @@ document.addEventListener('click', async (ev) => {
     const input = document.querySelector('#brief [name="style"]'); if (input) input.value = val;
     moodBtn.classList.toggle('on', i < 0); return;
   }
+  const dupSize = ev.target.closest('[data-dup-size]');
+  if (dupSize) { const d = dupSize.closest('dialog'); d.dataset.size = dupSize.dataset.dupSize; d.querySelectorAll('[data-dup-size]').forEach((b) => b.classList.toggle('on', b === dupSize)); return; }
   const sizeBtn = ev.target.closest('[data-size]');
   if (sizeBtn) { const [w, h] = sizeBtn.dataset.size.split('x').map(Number); setBrief('width', w); setBrief('height', h); renderBrief(); return; }
   const a = ev.target.closest('[data-action]');
@@ -1227,6 +1330,24 @@ document.addEventListener('click', async (ev) => {
         const patch = {idea: b.idea || b.plannerScript, script: b.plannerScript || b.script};
         S.cur.project = await api(`/api/projects/${id}`, {method: 'PATCH', body: {brief: patch}}); S.tab = 'brief'; go(id, 'brief'); toast('Script and details added to the video brief.'); break;
       }
+      case 'duplicate': openDuplicate(); break;
+      case 'dup-cancel': $('#dup-dialog')?.close(); break;
+      case 'dup-go': {
+        const d = $('#dup-dialog'), adapt = a.dataset.adapt === '1', [w, h] = d.dataset.size.split('x').map(Number);
+        d.querySelectorAll('button').forEach((b) => (b.disabled = true));
+        try {
+          const np = await api(`/api/projects/${id}/duplicate`, {method: 'POST', body: {title: $('#dup-title').value, width: w, height: h, adapt, notes: $('#dup-notes').value}});
+          d.close(); toast(adapt ? 'Copied. Claude is adapting it…' : 'Copied. Change the brief, then press Adapt with Claude.', 5000);
+          go(np.id, adapt ? 'build' : 'brief');
+        } catch (e) { d.querySelectorAll('button').forEach((b) => (b.disabled = false)); throw e; }
+        break;
+      }
+      case 'adapt-now': {
+        a.disabled = true;
+        await flushSave();
+        await api(`/api/projects/${id}/adapt`, {method: 'POST', body: {notes: $('#adapt-notes')?.value ?? ''}});
+        toast('Claude is adapting the video…'); S.tab = 'build'; go(id, 'build'); break;
+      }
       case 'delete':
         if (confirm(`Delete "${S.cur.project.title}" with its code, uploads and renders?`)) { await api(`/api/projects/${id}`, {method: 'DELETE'}); go(null); }
         break;
@@ -1242,6 +1363,7 @@ document.addEventListener('click', async (ev) => {
         try { await Promise.all(jobs); toast('Stop requested. It can take a few seconds to wind down.'); } catch (e) { a.disabled = false; toast(e.message); }
         break;
       }
+      case 'effects-clear': { setBrief('effects', []); renderBrief(); break; }
       case 'add-color': { const c = [...S.cur.project.brief.colors, '#1582D5']; setBrief('colors', c); renderBrief(); break; }
       case 'rm-color': { const c = S.cur.project.brief.colors.filter((_, i) => i !== Number(a.dataset.i)); setBrief('colors', c); renderBrief(); break; }
       case 'brand-palette': {
@@ -1380,7 +1502,7 @@ document.addEventListener('change', async (ev) => {
       const refs = new Set(S.cur.project.brief.plannerRefs || []); t.checked ? refs.add(t.dataset.plannerRef) : refs.delete(t.dataset.plannerRef);
         setBrief('plannerRefs', [...refs]); updatePlannerPreflight(); return;
     }
-    if (t.dataset.role) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.role)}`, {method: 'PATCH', body: {role: t.value}}); return; }
+    if (t.dataset.role) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.role)}`, {method: 'PATCH', body: {role: t.value}}); const as = S.cur.project.assets.find((x) => x.file === t.dataset.role); if (as) { as.role = t.value; renderAssets(); } return; }
     if (t.dataset.note != null) { await api(`/api/projects/${S.cur.project.id}/assets/${encodeURIComponent(t.dataset.note)}`, {method: 'PATCH', body: {note: t.value}}); return; }
     if (t.name === 'claude-model') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {model: t.value}}}); S.aiOpen = true; renderHome(); toast(t.value ? `MotionStudio will use ${t.value}.` : 'MotionStudio will use the Claude Code default model.'); return; }
     if (t.name === 'ai-provider') { S.state.settings = await api('/api/settings', {method: 'PUT', body: {ai: {provider: t.value}}}); S.aiOpen = true; renderHome(); return; }

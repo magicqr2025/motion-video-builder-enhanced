@@ -75,6 +75,48 @@ The model for building videos can be picked under **AI** on the home page.
    (half resolution) or the final MP4 and download it.
 6. **Save as preset.** Turns the approved approach into a new preset for next time.
 
+### V2 (the new look, now the default)
+
+Opening `http://localhost:4321/` (or `MotionStudio.exe`, or the VS Code task) shows V2: a redesigned front end (dark, glowing cards). The classic app is still
+there at **`http://localhost:4321/?classic=1`** (the **Classic UI** button at the top right of V2 goes there). V2 uses the same sign-in, the same data and
+the same API, so a change in one shows in the other. Old classic links such as `/#/p/<video>/build` or `/#/ppt/<deck>` open the matching V2 page.
+To make the classic app the default again, delete the small redirect script at the top of `web/index.html`. V2's files live in `web/v2/`.
+Every page now has a V2 version: Videos home; for each video Reference snapshots, Brief (story with AI script, score and hooks, ElevenLabs voiceover
+with audio tags, format, look, media), Look & feel, Concepts, Build & timing, Text, Style, Audio, Background and Preview & render; and the sections
+Library, Decks, Video tools, Storage and Activity. Use **Classic UI** at the top right to switch back.
+V2 has an animated background (a dotted world map with glowing flight routes and drifting shapes). The **Motion** switch in the top bar turns it off.
+
+### Scripts & voiceovers library (V2: Library → Scripts & voiceovers)
+
+Keeps scripts, and the audio made from them, apart from any one video so you can reuse them. Files live in `studio/data/audio-library/` (`index.json` plus an `.mp3` and its word timings per voiceover).
+- **Add:** *Add a script* (paste one), *Save to library* after generating a voiceover (on the Brief or Audio page; it keeps the exact script and voice settings), *Save to library* on the Story card (script only), or *Import voiceovers from my videos* (voiceovers your videos already have, saved with that video's current script).
+- **Reuse:** *Use in a video* puts the script into that video's Brief (for you to review) and/or the audio in as its voiceover. Voiceovers made with ElevenLabs bring their word timings, so they are not transcribed again. On the Brief and Audio pages, *From library* / *Script from library* / *Voiceover from library* do the same for the open video.
+- Also: copy the script, download the MP3, rename, edit the script or notes, delete. A video that used an item keeps its own copy.
+
+### Voiceover from the script (ElevenLabs)
+
+Under the Story card on the Brief page, the **Voiceover** panel turns the script into an MP3.
+
+1. Paste your ElevenLabs API key once (or set `ELEVENLABS_API_KEY`). It is kept in `studio/data/voice.json`, never shown again in the browser and never committed.
+2. Pick a voice, a model and the delivery, then **Generate voiceover**. You get a player and a **Download MP3** button. Nothing is added to the project yet.
+3. **Save to project as voiceover** adds it to Media with the voiceover role (and transcribes it for timing). An earlier voiceover stays in Media with the role `file`. If the Audio tab already exists, pick the new file there.
+
+**Audio tags** (Eleven v4, v4 Turbo and v3) are cues in square brackets that you type into the script or add from the palette, e.g. `[excited] Welcome back! [short pause] Today is [whispers] a secret.`
+They go to ElevenLabs only. Everywhere else they are stripped: word counts and the length estimate, the brief the video-building AI reads (so they never become captions or on-screen text), and the "fill the brief" step. The script writer keeps tags you already typed but never adds its own. With other models the tags are removed before sending, so they are never read aloud. Only a short bracket that starts with a letter counts as a tag, so `arr[0]` is left alone.
+
+### Duplicate and resize
+
+**⧉ Duplicate** (top right of any project) makes a full working copy under a new name: brief, uploaded media, concept, scenes
+(`src/studio/<id>/`), text, style, audio, look and storyboard. Renders, check stills and the chat are not copied, and the original is
+never touched. Pick a new size in the dialog (or keep it), add notes if you like, then:
+- **Duplicate only** costs nothing. Open the copy, change the Brief, Text, Style or Audio, then press **Adapt with Claude**.
+- **Duplicate & adapt with Claude** does both in one go.
+
+When the brief no longer matches the built video (different size, fps or copy), a yellow banner under the title offers **Adapt with
+Claude**. It is one Claude request: it keeps the concept, copy, timing and voiceover, re-lays-out the scenes for the new size
+(`adaptPrompt` in `server/prompts.mjs`), updates `storyboard.json` and checks the frames. Routes: `POST /api/projects/:id/duplicate`
+and `POST /api/projects/:id/adapt`. The copy logic is `duplicateProject` in `server/projects.mjs`.
+
 ### Look & feel (chosen before the concepts)
 
 The step after Brief. Every option has a small looping sample and an Off / Light / Full level, and there are one-click bundles

@@ -1,0 +1,4 @@
+{
+  "voiceover": {"src": "studio/promo-3d-city-webinar/voiceover-2026-10-28.mp3", "volume": 1, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": 76.0},
+  "music": {"src": null, "volume": 0.25, "muted": false, "startSec": 0, "trimStartSec": 0, "trimEndSec": null, "durationSec": null, "loop": true, "fadeInSec": 1, "fadeOutSec": 2, "duck": true, "duckLevel": 0.35}
+}

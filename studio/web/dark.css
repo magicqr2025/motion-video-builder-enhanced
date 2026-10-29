@@ -419,9 +419,72 @@ html[data-theme="dark"] .tasks li.next small { color: #e0b770; }
 html[data-theme="dark"] .tasks-now { background: #292626; border: 1px solid #333030; color: #cecaca; }
 html[data-theme="dark"] .tasks-ai li.in_progress { color: #cecaca; }
 
+/* from ai-badge.css */
+html[data-theme="dark"] .tabs .ai-badge { color: #f6c65a; background: linear-gradient(135deg, #dbb734, #a0831e); }
+
+/* from checks.css */
+html[data-theme="dark"] .st-big.ok,
+html[data-theme="dark"] .st-part i.ok u { color: #f6be5a; }
+
+/* from decks.css */
+html[data-theme="dark"] .dk-item:hover { border-color: #3a3737; background: #292626; }
+html[data-theme="dark"] .dk-item.on { background: #272525; }
+html[data-theme="dark"] .dk-ic { background: linear-gradient(180deg, #605a5a, var(--deep)); color: #e3e3e3; }
+html[data-theme="dark"] .dk-add { border: 1px dashed #3a3737; background: #292727; }
+html[data-theme="dark"] .dk-card input[type=text],
+html[data-theme="dark"] .dk-card input[type=number],
+html[data-theme="dark"] .dk-card input:not([type]),
+html[data-theme="dark"] .dk-card textarea,
+html[data-theme="dark"] .dk-card select,
+html[data-theme="dark"] .dk-add input { background: #2b2828; }
+html[data-theme="dark"] .dk-up { border: 2px dashed #383535; background: #292727; }
+html[data-theme="dark"] .dk-up.over { background: #262323; }
+html[data-theme="dark"] .dk-q { background: #2b2828; }
+html[data-theme="dark"] .dk-file { background: #2b2828; }
+html[data-theme="dark"] .dk-th { background: #262424; }
+html[data-theme="dark"] .dk-path { background: #262424; }
+html[data-theme="dark"] .dk-ic.on { background: linear-gradient(180deg, #7d7676, #6a6464); }
+html[data-theme="dark"] .dk-seg { background: #252323; }
+html[data-theme="dark"] .dk-seg button.on { background: #2b2828; color: #cfcfcf; }
+html[data-theme="dark"] .dk-lrow input { background: #2b2828; }
+html[data-theme="dark"] .dk-chat { background: #292727; }
+html[data-theme="dark"] .dk-msg.user { background: linear-gradient(180deg, #605a5a, var(--deep)); color: #e3e3e3; }
+html[data-theme="dark"] .dk-msg.text { background: #2b2828; }
+html[data-theme="dark"] .dk-msg.done { background: #192b1f; color: #6de39d; border: 1px solid #2d4836; }
+html[data-theme="dark"] .dk-msg.error { background: #341616; color: #d9787c; border: 1px solid #4b2325; }
+html[data-theme="dark"] .dk-working { color: #cfcfcf; }
+html[data-theme="dark"] #dk-chatmsg { background: #2b2828; }
+
+/* from duplicate.css */
+html[data-theme="dark"] #dup-dialog::backdrop { background: rgba(10, 20, 50, .45); }
+html[data-theme="dark"] .adapt-banner { background: #342d11; border: 1px solid #5e5227; color: #f6cd5a; }
+html[data-theme="dark"] .adapt-banner .muted { color: #d6c07b; }
+
+/* from library.css */
+html[data-theme="dark"] .lb-row { border: 1px solid #333030; }
+html[data-theme="dark"] .lb-thumb { background: #242222; }
+html[data-theme="dark"] .lb-play { background: rgba(10, 16, 40, .28); }
+html[data-theme="dark"] .lb-play svg { background: rgba(26,24,24,0.62); }
+html[data-theme="dark"] .lb-fmt { background: rgba(26,24,24,0.66); color: #e3e3e3; }
+html[data-theme="dark"] .lb-title:hover { color: #cfcfcf; }
+html[data-theme="dark"] .lb-detail { border-top: 1px solid #322f2f; }
+html[data-theme="dark"] .lb-files li { background: #282626; }
+html[data-theme="dark"] .lb-player { background: rgba(20,18,18,0.86); }
+html[data-theme="dark"] .lb-pbox video,
+html[data-theme="dark"] .lb-pbox img { background: #000; }
+html[data-theme="dark"] .lb-pcap { color: #cecaca; }
+html[data-theme="dark"] .lb-x { background: rgba(255, 255, 255, .16); }
+html[data-theme="dark"] .lb-x:hover { background: rgba(255, 255, 255, .3); }
+
 /* from login.css */
 html[data-theme="dark"] .lg-bolt { background: linear-gradient(145deg, #706a6a, #4d4949); }
 html[data-theme="dark"] html[data-theme="dark"] .lg-bolt { background: linear-gradient(145deg, #4c4848, #2d2b2b); }
 html[data-theme="dark"] .lg-bolt svg { fill: #f5d25c; }
 html[data-theme="dark"] .lg-f input:focus { border-color: #444040; }
 html[data-theme="dark"] .lg-pw button:hover { background: rgba(128, 128, 128, .12); }
+
+/* from motion.css */
+
+
+/* from voice.css */
+html[data-theme="dark"] .vo-link { color: #cfcfcf; }

@@ -9,18 +9,26 @@ import {COMPOSITIONS as P0} from './intro-waycrm-1m-style-2';
 import A0 from './intro-waycrm-1m-style-2/audio.json';
 import {COMPOSITIONS as P1} from './kit-demo';
 import {COMPOSITIONS as P2} from './lead-center-loop';
-import {COMPOSITIONS as P3} from './tutorial-animated-screens-2';
-import {COMPOSITIONS as P4} from './tutorial-animated-screens-3';
-import A4 from './tutorial-animated-screens-3/audio.json';
-import L4 from './tutorial-animated-screens-3/look.json';
-import {COMPOSITIONS as P5} from './tutorial-animated-screens-4';
-import A5 from './tutorial-animated-screens-4/audio.json';
-import L5 from './tutorial-animated-screens-4/look.json';
-import {COMPOSITIONS as P6} from './untitled-video';
-import A6 from './untitled-video/audio.json';
-import L6 from './untitled-video/look.json';
-import {COMPOSITIONS as P7} from './untitled-video-2';
-import L7 from './untitled-video-2/look.json';
+import {COMPOSITIONS as P3} from './lleads-in-exel-copy';
+import A3 from './lleads-in-exel-copy/audio.json';
+import L3 from './lleads-in-exel-copy/look.json';
+import {COMPOSITIONS as P4} from './promo-3d-city-webinar';
+import A4 from './promo-3d-city-webinar/audio.json';
+import L4 from './promo-3d-city-webinar/look.json';
+import {COMPOSITIONS as P5} from './tutorial-animated-screens-2';
+import {COMPOSITIONS as P6} from './tutorial-animated-screens-3';
+import A6 from './tutorial-animated-screens-3/audio.json';
+import L6 from './tutorial-animated-screens-3/look.json';
+import {COMPOSITIONS as P7} from './tutorial-animated-screens-4';
+import A7 from './tutorial-animated-screens-4/audio.json';
+import L7 from './tutorial-animated-screens-4/look.json';
+import {COMPOSITIONS as P8} from './untitled-video';
+import A8 from './untitled-video/audio.json';
+import L8 from './untitled-video/look.json';
+import {COMPOSITIONS as P9} from './untitled-video-2';
+import L9 from './untitled-video-2/look.json';
+import {COMPOSITIONS as P10} from './untitled-video-3';
+import A10 from './untitled-video-3/audio.json';
 
 const withAudio = (id: string, comps: StudioComp[], audio: AudioConfig): StudioComp[] =>
   comps.map((c) => (c.id === `Studio-${id}` ? {...c, component: withStudioAudio(c.component, audio)} : c));
@@ -31,11 +39,14 @@ const PROJECTS: [string, StudioComp[]][] = [
   ['intro-waycrm-1m-style-2', withAudio('intro-waycrm-1m-style-2', P0, A0 as AudioConfig)],
   ['kit-demo', P1],
   ['lead-center-loop', P2],
-  ['tutorial-animated-screens-2', P3],
-  ['tutorial-animated-screens-3', withAudio('tutorial-animated-screens-3', withLook(P4, L4 as LookConfig), A4 as AudioConfig)],
-  ['tutorial-animated-screens-4', withAudio('tutorial-animated-screens-4', withLook(P5, L5 as LookConfig), A5 as AudioConfig)],
-  ['untitled-video', withAudio('untitled-video', withLook(P6, L6 as LookConfig), A6 as AudioConfig)],
-  ['untitled-video-2', withLook(P7, L7 as LookConfig)],
+  ['lleads-in-exel-copy', withAudio('lleads-in-exel-copy', withLook(P3, L3 as LookConfig), A3 as AudioConfig)],
+  ['promo-3d-city-webinar', withAudio('promo-3d-city-webinar', withLook(P4, L4 as LookConfig), A4 as AudioConfig)],
+  ['tutorial-animated-screens-2', P5],
+  ['tutorial-animated-screens-3', withAudio('tutorial-animated-screens-3', withLook(P6, L6 as LookConfig), A6 as AudioConfig)],
+  ['tutorial-animated-screens-4', withAudio('tutorial-animated-screens-4', withLook(P7, L7 as LookConfig), A7 as AudioConfig)],
+  ['untitled-video', withAudio('untitled-video', withLook(P8, L8 as LookConfig), A8 as AudioConfig)],
+  ['untitled-video-2', withLook(P9, L9 as LookConfig)],
+  ['untitled-video-3', withAudio('untitled-video-3', P10, A10 as AudioConfig)],
 ];
 
 export const StudioCompositions: React.FC = () => (

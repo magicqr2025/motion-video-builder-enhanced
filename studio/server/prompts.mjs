@@ -4,6 +4,8 @@ import path from 'node:path';
 import {REEL, STUDIO, projectDir, projectAssets, projectCode, compId, conceptsCompId} from './paths.mjs';
 import {getPreset, getBrand, listPresets} from './projects.mjs';
 import {lookContext} from './look.mjs';
+import {inspirationContext, vocabulary} from './catalog.mjs';
+import {stripAudioTags} from './voice.mjs';
 
 const rel = (p) => path.relative(REEL, p).split(path.sep).join('/');
 
@@ -82,7 +84,18 @@ review it and render. Your text replies appear in the app's activity panel: keep
 - Review stills: render with --scale 0.5, look only at the frames that changed, at most 6 per round and at most 2 fix rounds. Do not re-render stills a change cannot have affected.
 - Batch edits, run tsc once per round, and keep replies to a few lines (no plans, recaps or restating the brief).
 
+## Creativity bar (what separates a designed video from a template)
+- Every scene has one signature motion moment (a reveal, a camera move, an object entrance) that is not shared with the neighbouring scene.
+- No two consecutive scenes use the same transition, text animation or layout. Vary rhythm: short beats, then a held beat before a big reveal.
+- The camera is never fully static, and text interacts with the scene (masked, staggered, following depth) instead of just fading in.
+- Concepts must differ in motion language, not only in colour: for example one calm and editorial, one punchy and kinetic.
+- A "Motion & layout direction" block in the project context is the user's explicit choice from the motion library or taken from their references: follow it before your own taste.
+- Motion library (names the user may write in notes, with the kit piece each means):
+${vocabulary()}
+
 ## Taste (the user's standing preferences)
+- NEVER build the 3D city scene (the three.js city fly-through: city.tsx, cam.ts, ScenesCity.tsx, "3D city" or "Lead City" style concepts), and do not copy it from existing videos. It renders far too slowly on this PC and the user does not want it again.
+  3D objects (the kit's Obj3D: phones, coins, chat bubbles) and glossy 3D icons are fine.
 - Glossy, illustration-rich, brand-coloured, polished. Anything plain or flat reads as unfinished: start at that
   level instead of iterating up to it. Glossy 3D icons/characters, never flat emoji.
 - Bold, large typography; short copy (one or two lines per item); every element animates in.
@@ -96,7 +109,7 @@ const fmtBrief = (p) => {
   const b = p.brief;
   const lines = [
     ['Title', p.title], ['Idea / goal', b.idea], ['Audience', b.audience], ['Call to action', b.cta],
-    ['Language', b.language], ['Script / voiceover text', b.script], ['Key on-screen text', b.onScreen],
+    ['Language', b.language], ['Script / voiceover text', stripAudioTags(b.script)], ['Key on-screen text', b.onScreen],
     ['Size', `${b.width}x${b.height} @ ${b.fps} fps`], ['Target duration', b.durationSec ? `${b.durationSec} s` : 'follow the voiceover / content'],
     ['Colours', (b.colors ?? []).join(', ')], ['Style words', b.style], ['Captions', b.captions], ['Links to study', b.links], ['Notes / do & don\'t', b.notes],
   ];
@@ -109,7 +122,7 @@ const fmtAssets = (p) => p.assets.length
 
 const fmtPreset = (p) => {
   const pr = getPreset(p.presetId);
-  if (!pr) return 'No preset: design freely. You can borrow from any existing video in src/. Available presets for inspiration:\n' + listPresets().map((x) => `- ${x.name}: ${x.tagline}`).join('\n');
+  if (!pr) return 'No preset: design freely. You can borrow from any existing video in src/. Available presets for inspiration:\n' + listPresets().filter((x) => !x.hidden).map((x) => `- ${x.name}: ${x.tagline}`).join('\n');
   return `**${pr.name}**: ${pr.tagline}\nReference composition: ${pr.example?.composition}. Reuse these files: ${pr.reuse.join(', ')}\nRecipe:\n${pr.recipe.map((r) => `- ${r}`).join('\n')}`;
 };
 
@@ -132,7 +145,7 @@ ${fmtAssets(p)}
 ${fmtPreset(p)}
 
 ### Brand
-${fmtBrand(p)}${p.look?.reviewed ? `\n\n${lookContext(p.look)}` : ''}`;
+${fmtBrand(p)}${p.look?.reviewed ? `\n\n${lookContext(p.look)}` : ''}${inspirationContext(p) ? `\n\n${inspirationContext(p)}` : ''}`;
 
 export const conceptsPrompt = (p, feedback) => `${context(p)}
 
@@ -173,7 +186,38 @@ export const revisePrompt = (p, message) => `${p.status === 'concepts' || p.stat
 
 User: ${message}`;
 
-export const briefChangedNote = (p) => `The user updated the brief or media. Current project context:\n\n${context(p)}`;
+const BRIEF_LABELS = {idea: 'Idea / goal', audience: 'Audience', cta: 'Call to action', language: 'Language', script: 'Script', onScreen: 'Key on-screen text', width: 'Width', height: 'Height', fps: 'FPS', durationSec: 'Target duration (s)', colors: 'Colours', style: 'Style words', captions: 'Captions', links: 'Links', notes: 'Notes', brandId: 'Brand'};
+const shortVal = (v) => { const s = Array.isArray(v) ? v.join(', ') : String(v ?? ''); return s.length > 240 ? `${s.slice(0, 240)}…` : s || '(empty)'; };
+// what the user changed in the brief of a duplicate since it was copied
+export const briefChanges = (p) => {
+  const from = p.duplicatedFrom?.brief;
+  if (!from) return [];
+  return Object.keys(BRIEF_LABELS).filter((k) => JSON.stringify(from[k] ?? null) !== JSON.stringify(p.brief[k] ?? null))
+    .map((k) => `- ${BRIEF_LABELS[k]}: ${shortVal(from[k])} → ${shortVal(p.brief[k])}`);
+};
+
+// A duplicate already has the whole working video. This asks Claude to adapt it, not to redesign it.
+export const adaptPrompt = (p, notes = '', sb = null) => {
+  const d = p.duplicatedFrom, built = sb?.width && sb?.height ? {width: sb.width, height: sb.height, fps: sb.fps ?? p.brief.fps} : d?.built ?? (d ? {width: d.brief.width, height: d.brief.height, fps: d.brief.fps} : null);
+  const changes = briefChanges(p), resized = built && (built.width !== p.brief.width || built.height !== p.brief.height);
+  return `${context(p)}
+
+## Task: adapt this video to its new brief (do NOT start over)
+${d ? `This project is a duplicate of "${d.title}" (${d.id}). Its code, media, concept, text.json, audio.json and storyboard.json were copied and the ids renamed, so ${compId(p.id)} already plays at its old settings (${built ? `${built.width}x${built.height} @ ${built.fps} fps` : 'size unknown'}). Read the existing code in ${rel(projectCode(p.id))}/ and keep the approved concept, copy, motion language and voiceover timing. Only change what the new brief and the notes need. Do not touch ${d.id}.` : `The video ${compId(p.id)} is already built.`}
+
+### What changed in the brief
+${changes.length ? changes.join('\n') : '- (nothing in the brief form changed)'}
+${notes ? `\n### The user also said\n> ${notes.replace(/\n/g, '\n> ')}\n` : ''}
+### Steps
+1. ${resized ? `**Resize to ${p.brief.width}x${p.brief.height}.** Set the size in config.ts (W.width / W.height, and in index.tsx for ${compId(p.id)} and ${conceptsCompId(p.id)}), then re-lay-out every scene for the new frame instead of scaling it: positions, font sizes, safe areas${p.brief.height > p.brief.width ? ' (vertical: stack side-by-side layouts, keep captions and key text clear of the top ~250 px and bottom ~350 px, bigger type)' : p.brief.width > p.brief.height ? ' (horizontal: use the width, put text and media side by side, keep type from getting too large)' : ''}, crops of screenshots and footage, grids and card sizes. Prefer values derived from W over hard-coded pixels so the next resize is easy.` : 'The size is unchanged, so leave the layout alone unless the notes ask for it.'}
+2. If fps changed, keep every duration in seconds the same (convert frames).
+3. Apply the other brief changes: new copy and CTA through text.json, colours through style.json, language, captions. Voiceover, music and the Look & feel settings stay as they are unless the brief says otherwise.
+4. Keep the timing synced to the voiceover. Update ${projectDir(p.id)}/storyboard.json (width, height, fps, durationSec, scenes) so it matches the adapted video.
+5. Typecheck, then render 6-10 check stills across the timeline into ${projectDir(p.id)}/checks/ (names like 01-hook-2.4s.png), look at every one for clipped, overlapping or off-screen elements, fix, re-render.
+Reply with 2-4 short lines: what you changed and anything the user should watch for.`;
+};
+
+export const briefChangedNote =(p) => `The user updated the brief or media. Current project context:\n\n${context(p)}`;
 
 export const savePresetPrompt = (p, name) => `Save this project's approach as a reusable preset so the user never has to explain it again.
 Write ${path.join(STUDIO, 'presets')}/<slug>.json with the same schema as the other presets there

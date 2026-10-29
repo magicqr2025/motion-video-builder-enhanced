@@ -1,0 +1,57 @@
+{
+  "about": "The motion vocabulary of MotionStudio. The brief UI shows these as pickable chips, reference uploads are tagged with the categories, and the agent is told exactly which kit piece each id means. Add an entry here when you add something to src/studio/kit.",
+  "categories": [
+    {"id": "transitions", "title": "Scene transitions", "hint": "how one scene hands over to the next"},
+    {"id": "text", "title": "Text animation", "hint": "how words and headlines appear"},
+    {"id": "camera", "title": "Camera & depth", "hint": "movement of the virtual camera and layers"},
+    {"id": "layout", "title": "Layouts", "hint": "how a scene is composed on the canvas"},
+    {"id": "accents", "title": "Accents & polish", "hint": "details that make it feel premium"},
+    {"id": "pacing", "title": "Pacing & rhythm", "hint": "how the cuts and beats feel"}
+  ],
+  "items": [
+    {"id": "tr-fade", "cat": "transitions", "name": "Soft fade", "desc": "Gentle crossfade with a tiny scale", "kit": "<SceneSeq type=\"fade\">"},
+    {"id": "tr-slide", "cat": "transitions", "name": "Slide", "desc": "Next scene slides in sideways", "kit": "<SceneSeq type=\"slide\" dir>"},
+    {"id": "tr-push", "cat": "transitions", "name": "Push", "desc": "New scene pushes the old one off screen", "kit": "<SceneSeq type=\"push\" dir>"},
+    {"id": "tr-wipe", "cat": "transitions", "name": "Wipe", "desc": "New scene is revealed over the old", "kit": "<SceneSeq type=\"wipe\" dir>"},
+    {"id": "tr-zoom", "cat": "transitions", "name": "Zoom through", "desc": "Old scene scales away, new one scales in", "kit": "<SceneSeq type=\"zoom\">"},
+    {"id": "tr-blur", "cat": "transitions", "name": "Blur dissolve", "desc": "Defocus out, focus in", "kit": "<SceneSeq type=\"blur\">"},
+    {"id": "tr-flip", "cat": "transitions", "name": "3D flip", "desc": "Scene turns like a card", "kit": "<SceneSeq type=\"flip\" dir>"},
+    {"id": "tr-cube", "cat": "transitions", "name": "Cube turn", "desc": "Quarter turn around the shared edge", "kit": "<SceneSeq type=\"cube\" dir>"},
+    {"id": "tr-iris", "cat": "transitions", "name": "Iris circle", "desc": "New scene opens as a growing circle", "kit": "<SceneSeq type=\"iris\">"},
+    {"id": "tr-split", "cat": "transitions", "name": "Split open", "desc": "New scene opens from the middle outwards", "kit": "<SceneSeq type=\"split\">"},
+    {"id": "tr-shutter", "cat": "transitions", "name": "Shutter blinds", "desc": "Horizontal blinds open to the next scene", "kit": "<SceneSeq type=\"shutter\">"},
+    {"id": "tr-glitch", "cat": "transitions", "name": "Glitch cut", "desc": "RGB split and jitter, techy and energetic", "kit": "<SceneSeq type=\"glitch\">"},
+
+    {"id": "tx-mask", "cat": "text", "name": "Mask reveal", "desc": "Lines rise out of an invisible mask (clean, editorial)", "kit": "<TextReveal variant=\"mask\">"},
+    {"id": "tx-words", "cat": "text", "name": "Word by word", "desc": "Each word pops up in turn", "kit": "<TextReveal variant=\"words\">"},
+    {"id": "tx-letters", "cat": "text", "name": "Springy letters", "desc": "Letters bounce in one by one (playful)", "kit": "<TextReveal variant=\"letters\" level=2>"},
+    {"id": "tx-blur", "cat": "text", "name": "Blur into focus", "desc": "Words come out of a blur (cinematic)", "kit": "<TextReveal variant=\"blur\">"},
+    {"id": "tx-scramble", "cat": "text", "name": "Scramble decode", "desc": "Random glyphs resolve into the text (techy)", "kit": "<TextReveal variant=\"scramble\">"},
+    {"id": "tx-type", "cat": "text", "name": "Typewriter", "desc": "Typed out with a blinking caret", "kit": "<TextReveal variant=\"type\">"},
+    {"id": "tx-rise", "cat": "text", "name": "Soft rise", "desc": "The whole block floats up and sharpens", "kit": "<TextReveal variant=\"rise\">"},
+    {"id": "tx-kinetic", "cat": "text", "name": "Kinetic captions", "desc": "Captions that follow the voice word by word", "kit": "<KineticCaptions>"},
+
+    {"id": "cam-push", "cat": "camera", "name": "Slow push-in", "desc": "Subtle zoom-in through each scene", "kit": "<CameraRig>"},
+    {"id": "cam-glide", "cat": "camera", "name": "Guided glide", "desc": "Camera glides to the part being explained", "kit": "<CameraRig keys>"},
+    {"id": "cam-parallax", "cat": "camera", "name": "Parallax layers", "desc": "Foreground and background drift at different speeds", "kit": "<Parallax depth>"},
+    {"id": "cam-spotlight", "cat": "camera", "name": "Spotlight focus", "desc": "Dim everything except what is being explained", "kit": "<Spotlight keys>"},
+    {"id": "cam-3d", "cat": "camera", "name": "3D hero objects", "desc": "Real 3D phone, coin, bubble or card floating in space", "kit": "<Obj3D kind>"},
+
+    {"id": "lay-split", "cat": "layout", "name": "Split screen", "desc": "Two panels side by side (text and visual, before and after)", "kit": "<SplitLayout>"},
+    {"id": "lay-bento", "cat": "layout", "name": "Bento grid", "desc": "Mixed-size tiles that pop in one after another", "kit": "<BentoGrid>"},
+    {"id": "lay-stack", "cat": "layout", "name": "Card stack", "desc": "Fanned cards that cycle one by one (features, testimonials)", "kit": "<CardStack>"},
+    {"id": "lay-marquee", "cat": "layout", "name": "Scrolling band", "desc": "Endless sideways band of logos or keywords", "kit": "<Marquee>"},
+    {"id": "lay-hero", "cat": "layout", "name": "Hero centre", "desc": "One big subject centred with a short headline (compose with SpringIn)", "kit": "<SpringIn> + <TextReveal>"},
+    {"id": "lay-ui", "cat": "layout", "name": "UI walk-through", "desc": "Screenshot or app frame with cursor, toggles, counters", "kit": "<CursorPath> <Toggle> <CountUp> <Notification>"},
+
+    {"id": "acc-sweep", "cat": "accents", "name": "Light sweep", "desc": "A shine glides across cards and titles", "kit": "<LightSweep>"},
+    {"id": "acc-particles", "cat": "accents", "name": "Floating particles", "desc": "Sparkles and shapes drifting behind the content", "kit": "<Particles>"},
+    {"id": "acc-spring", "cat": "accents", "name": "Springy entrances", "desc": "Everything overshoots and settles", "kit": "<SpringIn level=2>"},
+    {"id": "acc-count", "cat": "accents", "name": "Counting numbers", "desc": "Stats count up with progress bars", "kit": "<CountUp> <ProgressBar>"},
+
+    {"id": "pace-fast", "cat": "pacing", "name": "Fast cuts", "desc": "Scenes 1.5 to 2.5 s, hard rhythm, a new visual every beat", "kit": "timing rule"},
+    {"id": "pace-calm", "cat": "pacing", "name": "Calm & smooth", "desc": "Longer holds, slow moves, room to breathe", "kit": "timing rule"},
+    {"id": "pace-beat", "cat": "pacing", "name": "Beat-synced", "desc": "Cuts and hits land on the voice or music beats", "kit": "timing rule"},
+    {"id": "pace-build", "cat": "pacing", "name": "Slow build to a reveal", "desc": "Quiet start, tension, then one big payoff moment", "kit": "timing rule"}
+  ]
+}

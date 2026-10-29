@@ -1,0 +1,19 @@
+{
+  "Hook": {"line1": "Leads Stuck in", "line2": "Excel Sheets?", "sheet": "leads.xlsx"},
+  "Ads": {"headline": "You Pay for Ads", "lead": "A Lead Comes In", "call": "One Call…", "ended": "…Then It Ends"},
+  "FollowUps": {"intro": "Converting a Lead Takes", "big": "4+ Follow-ups", "steps": ["Call", "WhatsApp", "Meeting", "Proposal"], "once": "Talk Only Once?", "noRetarget": "No Way to Retarget"},
+  "Example": {"tag": "Example", "headline": "1 Ad = 10 Leads", "converted": "3 Converted", "paid": "₹ Paid for 10", "lost": "7 Lost", "excel": "Excel Sheet", "phone": "Staff Phone", "wasted": "Money Wasted"},
+  "Reveal": {"headline": "Problem Solved", "sub": "Complete AI Automation Software"},
+  "WhatsApp": {"tag": "Step 1", "title": "WhatsApp Automation", "sub": "Manages & nurtures every new lead, instantly"},
+  "Calling": {"tag": "Step 2", "title": "AI Calling Sales Agent", "sub": "Converts with the right pitch"},
+  "Pipeline": {"tag": "Step 3", "title": "Complete Sales Pipeline", "newLeads": "New Leads", "won": "Won", "sub": "No reply? Retarget them later"},
+  "Result": {"label": "Result", "items": ["More Conversions", "More Sales", "More Revenue"], "upTo": "Up to", "growth": "x Growth", "team": "Team Always Productive"},
+  "CTA": {"by": "by", "signup": "Sign Up Now", "site": "waycrm.in"},
+  "_help": {"Hook.line2": "max ~16 chars", "FollowUps.steps": "one word each", "Result.items": "max ~18 chars", "CTA.site": "website shown on the CTA"},
+  "_concepts": {
+    "A_Hook": {"line1": "Turn More Leads", "line2": "into Paying Clients", "sub": "AI-Powered Sales CRM for Growing Businesses"},
+    "A_Feature": {"tag": "Feature 01", "title": "AI Calling Sales Agent", "sub": "Calls, qualifies and books meetings"},
+    "B_Feed": {"live": "Live activity", "headline": "Every Lead on Autopilot", "sub": "Capture, nurture and convert automatically"},
+    "B_Bento": {"title": "Sales Pipeline", "newLeads": "New Leads", "won": "Won", "features": ["AI Calling", "WhatsApp Follow-ups", "Sales Pipeline", "Manage Your Team"], "cta": "Get WayCRM Now"}
+  }
+}

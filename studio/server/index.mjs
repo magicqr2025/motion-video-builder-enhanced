@@ -7,12 +7,12 @@ import {exec, execFile} from 'node:child_process';
 import express from 'express';
 import multer from 'multer';
 import {DATA, WEB, REEL, projectDir, projectAssets, projectCode, compId, conceptsCompId} from './paths.mjs';
-import {listPresets, listBrands, getPreset, listProjects, getProject, saveProject, createProject, deleteProject, readConcepts, readStoryboard, listImages, readLog, appendLog} from './projects.mjs';
+import {listPresets, listBrands, getPreset, listProjects, getProject, saveProject, createProject, duplicateProject, markAiStep, backfillAiSteps, deleteProject, readConcepts, readStoryboard, listImages, readLog, appendLog} from './projects.mjs';
 import {runAgent, isBusy, stopAgent, busyList} from './agent.mjs';
 import {bindActivity, activityLog, recentActivity, lastActivityAt, startProcess, endProcess, patchProcess, listProcesses, runningProcesses, processesCsv, readHistory, listDays} from './activity.mjs';
-import {conceptsPrompt, buildPrompt, resumeBuildPrompt, revisePrompt, briefChangedNote, savePresetPrompt, textPrompt, reviewPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
+import {conceptsPrompt, buildPrompt, resumeBuildPrompt, revisePrompt, briefChangedNote, adaptPrompt, savePresetPrompt, textPrompt, reviewPrompt, textEditedNote, audioPrompt, audioEditedNote, backgroundPrompt, BG_OBJECTS, stylePrompt, styleEditedNote} from './prompts.mjs';
 import {renderStills, renderVideo, probe, extractReference, startRemotionStudio, stopRemotionStudio, writeRegistry, sweepBundles, STUDIO_PORT} from './remotion.mjs';
-import {transcribeFile} from './transcribe.mjs';
+import {transcribeFile, TRANSCRIBE_MODES} from './transcribe.mjs';
 import {readSettings, writeSettings, publicSettings, updateAi, aiConfig, aiRuntime} from './settings.mjs';
 import {pingModel} from './providers/openai.mjs';
 import {mountTools} from './tools.mjs';
@@ -20,9 +20,14 @@ import {mountFiles} from './files.mjs';
 import {emptyReview, cleanReview, pendingCount, reviewSummary, clearSent} from './review.mjs';
 import {mountStory, stopStory} from './story.mjs';
 import {mountStorage} from './storage.mjs';
+import {mountLibrary} from './library.mjs';
+import {mountDecks} from './decks.mjs';
+import {mountVoice} from './voice.mjs';
+import {mountAudioLibrary} from './audiolib.mjs';
 import {mountAuth} from './auth.mjs';
 import {ensureDarkCss} from './darkcss.mjs';
 import {convertAnimated, OUTPUT_FORMATS, ANIM_WIDTHS, ANIM_FPS} from './animate.mjs';
+import {getCatalog, cleanBorrow, cleanPicks} from './catalog.mjs';
 import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges, lookChangePrompt} from './look.mjs';
 
 const PORT = Number(process.env.PORT ?? 4321);
@@ -102,6 +107,15 @@ const ROUTES = [
   ['POST', /\/review\/send$/, 'Sent your review to the AI'],
   ['POST', /\/approve-build$/, 'Approved the build'],
   ['DELETE', /\/approve-build$/, 'Withdrew the approval'],
+  ['PUT', /^\/voice$/, 'Saved ElevenLabs settings'],
+  ['POST', /\/voice\/generate$/, 'Asked ElevenLabs for a voiceover'],
+  ['POST', /\/voice\/save$/, 'Saved the voiceover to the project'],
+  ['POST', /\/voice\/keep$/, 'Saved the voiceover to the library'],
+  ['POST', /^\/vo-library\/script$/, 'Saved a script to the library'],
+  ['POST', /^\/vo-library\/import$/, 'Imported a voiceover into the library'],
+  ['POST', /^\/vo-library\/[^/]+\/use$/, 'Reused a library item in a video'],
+  ['PATCH', /^\/vo-library\//, 'Edited a library item'],
+  ['DELETE', /^\/vo-library\//, 'Deleted a library item'],
   ['POST', /\/scene-frame$/, 'Refreshing scene frames'],
   ['POST', /\/fresh-session$/, 'Started a fresh AI conversation'],
   ['POST', /\/save-preset$/, 'Asked the AI to save a preset'],
@@ -218,10 +232,11 @@ const processAssetNow = async (id, file) => {
 
 // ---------- state ----------
 app.get('/api/state', wrap(async (req, res) => {
-  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: publicSettings(), lookSpec: LOOK_SPEC});
+  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: publicSettings(), lookSpec: LOOK_SPEC, catalog: getCatalog()});
 }));
 
 app.post('/api/projects', wrap(async (req, res) => {
+  if (getPreset(req.body.presetId)?.hidden) throw Object.assign(new Error('That preset is switched off. Pick another one.'), {status: 400});
   const p = createProject({title: req.body.title?.trim() || getPreset(req.body.presetId)?.name || 'Untitled video', presetId: req.body.presetId});
   broadcast({type: 'projects'});
   res.json(p);
@@ -261,7 +276,8 @@ app.get('/api/projects/:id/build-progress', wrap(async (req, res) => {
 app.get('/api/projects/:id', wrap(async (req, res) => {
   const p = need(req.params.id);
   syncLook(p);
-  res.json({project: p, referenceFrames: referenceFrames(p), concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), audio: await fillDurations(p.id), background: readBackground(p.id), style: readStyle(p.id), log: readLog(p.id).slice(-400), busy: isBusy(p.id),
+  if (backfillAiSteps(p)) saveProject(p);
+  res.json({project: p, referenceFrames: referenceFrames(p), concepts: readConcepts(p.id), storyboard: readStoryboard(p.id), checks: listImages(p.id, 'checks'), text: readText(p.id), audio: await fillDurations(p.id), background: readBackground(p.id), style: readStyle(p.id), log: req.query.nolog ? [] : readLog(p.id).slice(-400), busy: isBusy(p.id),
     compositions: {video: compId(p.id), concepts: conceptsCompId(p.id)}, renderJob: renderJob?.projectId === p.id ? renderJob : null, resumable: isResumable(p)});
 }));
 
@@ -269,7 +285,7 @@ app.patch('/api/projects/:id', wrap(async (req, res) => {
   const p = need(req.params.id);
   if (typeof req.body.title === 'string' && req.body.title.trim()) p.title = req.body.title.trim();
   if ('presetId' in req.body) p.presetId = req.body.presetId || null;
-  if (req.body.brief) { p.brief = {...p.brief, ...req.body.brief}; if (p.sessionId) p.briefDirty = true; }
+  if (req.body.brief) { p.brief = {...p.brief, ...req.body.brief}; if ('effects' in req.body.brief) p.brief.effects = cleanPicks(req.body.brief.effects); if (p.sessionId) p.briefDirty = true; }
   if (req.body.status) p.status = req.body.status;
   saveProject(p); changed(p.id); broadcast({type: 'projects'});
   res.json(p);
@@ -289,24 +305,48 @@ mountTools(app, {upload, wrap, broadcast, enqueue: (fn) => { mediaQueue = mediaQ
 mountStory(app, {wrap, need, changed, broadcast});
 ensureDarkCss();
 mountStorage(app, {wrap, need, changed, broadcast, busy: () => ({render: renderJob && !renderJob.done ? renderJob.projectId : null, ai: busyList().map((b) => b.id)})});
+mountDecks(app, {wrap});
+mountLibrary(app, {wrap, need, busy: () => ({render: renderJob && !renderJob.done ? renderJob.projectId : null, ai: busyList().map((b) => b.id)})});
+// Copies a file into the project's assets and records it (not saved yet: the caller saves the project). Used by uploads and by saved voiceovers.
+const addAssetFile = async (p, srcPath, original, mime, role) => {
+  fs.mkdirSync(projectAssets(p.id), {recursive: true});
+  let name = safeName(original);
+  while (p.assets.some((a) => a.file === name)) name = name.replace(/(\.[^.]+)?$/, (ext) => `-${Date.now() % 1000}${ext}`);
+  const dest = path.join(projectAssets(p.id), name);
+  fs.copyFileSync(srcPath, dest);
+  const kind = kindOf(mime, name);
+  const info = kind === 'audio' || kind === 'video' ? await probe(dest).catch(() => null) : null;
+  const asset = {file: name, original, kind, role: role || defaultRole(kind, original), size: fs.statSync(dest).size, info, addedAt: Date.now()};
+  p.assets.push(asset);
+  return asset;
+};
 app.post('/api/projects/:id/assets', upload.array('files', 30), wrap(async (req, res) => {
   const p = need(req.params.id);
-  fs.mkdirSync(projectAssets(p.id), {recursive: true});
   for (const f of req.files ?? []) {
-    const original = Buffer.from(f.originalname, 'latin1').toString('utf8');
-    let name = safeName(original);
-    while (p.assets.some((a) => a.file === name)) name = name.replace(/(\.[^.]+)?$/, (ext) => `-${Date.now() % 1000}${ext}`);
-    fs.copyFileSync(f.path, path.join(projectAssets(p.id), name));
+    await addAssetFile(p, f.path, Buffer.from(f.originalname, 'latin1').toString('utf8'), f.mimetype, req.body.role);
     fs.rmSync(f.path, {force: true});
-    const kind = kindOf(f.mimetype, name);
-    const info = kind === 'audio' || kind === 'video' ? await probe(path.join(projectAssets(p.id), name)).catch(() => null) : null;
-    p.assets.push({file: name, original, kind, role: req.body.role || defaultRole(kind, original), size: f.size, info, addedAt: Date.now()});
   }
   if (p.sessionId) p.briefDirty = true;
   saveProject(p); changed(p.id);
   for (const a of p.assets) processAsset(p.id, a.file);
   res.json(p.assets);
 }));
+// ElevenLabs voiceover from the script (see voice.mjs). A generated file stays a draft until the user saves it into the project.
+const storeVoiceAsset = async (p, src, original, mime, role, transcript = null) => {
+  if (role === 'voiceover') for (const a of p.assets) if (a.role === 'voiceover') a.role = 'file'; // one voiceover per video: the earlier one stays in Media, change its role there to bring it back
+  const asset = await addAssetFile(p, src, original, mime, role);
+  if (transcript?.words?.length) { // the voice service gave the word timings with the audio: store them as the transcript, so nothing needs transcribing
+    fs.mkdirSync(path.join(projectDir(p.id), 'transcripts'), {recursive: true});
+    fs.writeFileSync(path.join(projectDir(p.id), 'transcripts', `${asset.file}.json`), JSON.stringify(transcript, null, 1));
+    asset.transcript = `transcripts/${asset.file}.json`; asset.words = transcript.words.length;
+  }
+  if (p.sessionId) p.briefDirty = true;
+  saveProject(p);
+  processAsset(p.id, asset.file); // transcribe it like any uploaded voiceover (skipped when it already has its timings)
+  return asset;
+};
+mountVoice(app, {wrap, need, probe, changed, storeAsset: storeVoiceAsset});
+mountAudioLibrary(app, {wrap, need, probe, changed, storeAsset: storeVoiceAsset});
 
 // Script planning analyzes reference frames in small batches and streams progress to the browser.
 app.post('/api/projects/:id/script-plan', wrap(async (req, res) => {
@@ -393,7 +433,7 @@ app.post('/api/projects/:id/script-plan', wrap(async (req, res) => {
   }
   for (const k of ['plannerScript', 'plannerAnalysis']) if (typeof result[k] === 'string') next[k] = result[k];
   next.plannerRefs = brief.plannerRefs ?? [];
-  p.brief = next; saveProject(p); changed(p.id);
+  p.brief = next; markAiStep(p, 'script'); saveProject(p); changed(p.id);
   progress('done', 'Script plan ready.', frames.length, frames.length);
   res.json({brief: next});
   } catch (error) {
@@ -416,6 +456,7 @@ app.patch('/api/projects/:id/assets/:file', wrap(async (req, res) => {
   if (!a) return res.status(404).json({error: 'No such file'});
   if (req.body.role) a.role = req.body.role;
   if (typeof req.body.note === 'string') a.note = req.body.note;
+  if (Array.isArray(req.body.borrow)) a.borrow = cleanBorrow(req.body.borrow);
   if (p.sessionId) p.briefDirty = true;
   saveProject(p); changed(p.id); processAsset(p.id, a.file);
   res.json(a);
@@ -441,8 +482,9 @@ app.delete('/api/projects/:id/reference-frames/:file/:frame', wrap(async (req, r
 }));
 
 // ---------- agent phases ----------
-const startTurn = (p, prompt, label, {before, after} = {}) => {
+const startTurn = (p, prompt, label, {before, after, step} = {}) => {
   busyGuard(p.id);
+  markAiStep(p, step);
   if (p.approval && readStoryboard(p.id)) { p.approval = null; appendLog(p.id, {kind: 'system', text: 'The AI is changing the video, so the earlier approval was cleared. Approve again when you are happy.'}); }
   if (before) { Object.assign(p, before); saveProject(p); }
   if (p.briefDirty && !prompt.includes('### Brief')) prompt = `${briefChangedNote(p)}\n\n${prompt}`;
@@ -462,9 +504,35 @@ app.post('/api/projects/:id/concepts', wrap(async (req, res) => {
   const p = need(req.params.id);
   const prev = p.status;
   startTurn(p, conceptsPrompt(p, req.body.feedback), req.body.feedback ? `Revise concepts: ${req.body.feedback}` : 'Generate concepts from the brief', {
-    before: {status: 'concepting'},
+    step: 'concepts', before: {status: 'concepting'},
     after: (q, ok) => { q.status = readConcepts(q.id)?.concepts?.length ? 'concepts' : prev === 'concepting' ? 'brief' : prev; },
   });
+  res.json({ok: true});
+}));
+
+// Duplicate: a full working copy under a new id (optionally with a new size), then optionally let Claude adapt it to the brief.
+const adaptTurn = (p, notes) => startTurn(p, adaptPrompt(p, notes, readStoryboard(p.id)), `Adapt the video to its new brief${notes ? `: ${notes}` : ''}`, {
+  step: 'build', before: {status: 'building'},
+  after: (q, ok) => {
+    const sb = readStoryboard(q.id);
+    q.status = sb ? 'review' : 'brief';
+    // what the next "changed since" is measured against
+    if (ok) { q.adaptedAt = new Date().toISOString(); if (q.duplicatedFrom) { q.duplicatedFrom.brief = structuredClone(q.brief); q.duplicatedFrom.built = sb ? {width: sb.width, height: sb.height, fps: sb.fps} : null; } }
+  },
+});
+app.post('/api/projects/:id/duplicate', wrap(async (req, res) => {
+  const src = need(req.params.id); busyGuard(src.id);
+  if (renderJob && !renderJob.done && renderJob.projectId === src.id) throw Object.assign(new Error('A render of this video is running. Wait for it or cancel it first.'), {status: 409});
+  const {title, width, height, fps, adapt = false, notes = ''} = req.body ?? {};
+  const p = duplicateProject(src.id, {title, width, height, fps});
+  writeRegistry();
+  broadcast({type: 'projects'});
+  if (adapt) adaptTurn(p, String(notes).trim());
+  res.json(p);
+}));
+app.post('/api/projects/:id/adapt', wrap(async (req, res) => {
+  const p = need(req.params.id);
+  adaptTurn(p, String(req.body?.notes ?? '').trim());
   res.json({ok: true});
 }));
 
@@ -473,7 +541,7 @@ app.post('/api/projects/:id/approve', wrap(async (req, res) => {
   const {conceptId, notes = ''} = req.body;
   const c = readConcepts(p.id)?.concepts?.find((x) => x.id === conceptId);
   startTurn(p, buildPrompt(p, conceptId, notes), `Approved concept ${c?.name ? `"${c.name}"` : conceptId}${notes ? `: ${notes}` : ''}. Build the full video.`, {
-    before: {status: 'building', approvedConcept: {id: conceptId, name: c?.name ?? conceptId, notes}, ...(p.look ? {look: {...p.look, applied: {levels: builtLevels(p.look)}}} : {})},
+    step: 'build', before: {status: 'building', approvedConcept: {id: conceptId, name: c?.name ?? conceptId, notes}, ...(p.look ? {look: {...p.look, applied: {levels: builtLevels(p.look)}}} : {})},
     after: (q) => { q.status = readStoryboard(q.id) ? 'review' : 'concepts'; },
   });
   res.json({ok: true});
@@ -487,7 +555,7 @@ app.post('/api/projects/:id/resume-build', wrap(async (req, res) => {
   if (readStoryboard(p.id)) throw Object.assign(new Error('This video is already built.'), {status: 409});
   const {id: conceptId, name, notes = ''} = p.approvedConcept;
   startTurn(p, resumeBuildPrompt(p, conceptId, notes), `Resume the build of “${name ?? conceptId}” where it stopped.`, {
-    before: {status: 'building'},
+    step: 'build', before: {status: 'building'},
     after: (q) => { q.status = readStoryboard(q.id) ? 'review' : 'concepts'; },
   });
   res.json({ok: true});
@@ -500,6 +568,7 @@ app.post('/api/projects/:id/message', wrap(async (req, res) => {
   // a conversation already exists for this project (Claude, Codex or another model): do not re-send the whole brief
   const first = !p.sessionId && !p.codexSessionId && !fs.existsSync(path.join(projectDir(p.id), 'agent-session.json'));
   startTurn(p, first ? `${briefChangedNote(p)}\n\n${revisePrompt(p, text)}` : revisePrompt(p, text), text, {
+    step: readStoryboard(p.id) ? 'build' : readConcepts(p.id)?.concepts?.length ? 'concepts' : null,
     after: (q) => { if (q.status === 'building') q.status = readStoryboard(q.id) ? 'review' : q.status; if (q.status === 'brief' && readConcepts(q.id)?.concepts?.length) q.status = 'concepts'; },
   });
   res.json({ok: true});
@@ -536,6 +605,7 @@ app.post('/api/projects/:id/review/send', wrap(async (req, res) => {
   const rv = cleanReview(p.review);
   if (!pendingCount(rv)) throw Object.assign(new Error('Write at least one correction or add a scene first.'), {status: 400});
   startTurn(p, reviewPrompt(p, rv, sb), `Apply your review: ${reviewSummary(rv)}`, {
+    step: 'build',
     after: (q, ok) => {
       if (!ok) return;
       q.reviewHistory = [...(q.reviewHistory ?? []), {at: new Date().toISOString(), round: q.round ?? 0, review: rv}].slice(-30);
@@ -619,7 +689,7 @@ app.put('/api/projects/:id/text', wrap(async (req, res) => {
 }));
 app.post('/api/projects/:id/make-text-editable', wrap(async (req, res) => {
   const p = need(req.params.id);
-  startTurn(p, textPrompt(p), 'Make the on-screen text editable in the browser');
+  startTurn(p, textPrompt(p), 'Make the on-screen text editable in the browser', {step: 'text'});
   res.json({ok: true});
 }));
 
@@ -696,7 +766,7 @@ app.post('/api/projects/:id/make-audio-editable', wrap(async (req, res) => {
   const have = readAudio(p.id);
   if (have) return res.json({audio: have});
   if (ownsAudio(p.id)) {
-    startTurn(p, audioPrompt(p), 'Move the audio into audio.json so it is editable in the browser');
+    startTurn(p, audioPrompt(p), 'Move the audio into audio.json so it is editable in the browser', {step: 'audio'});
     return res.json({agent: true});
   }
   const pick = (role) => p.assets.find((a) => a.role === role && (a.kind === 'audio' || a.kind === 'video'));
@@ -726,7 +796,7 @@ app.post('/api/projects/:id/background', wrap(async (req, res) => {
   };
   if (!o.objects.length && !o.custom) throw Object.assign(new Error('Pick at least one kind of object or describe your own.'), {status: 400});
   const what = [...o.objects, o.custom].filter(Boolean).join(', ');
-  startTurn(p, backgroundPrompt(p, o), `Add animated background objects (${what}), ${o.intensity}${o.scenes ? `, scenes: ${o.scenes}` : ''}`);
+  startTurn(p, backgroundPrompt(p, o), `Add animated background objects (${what}), ${o.intensity}${o.scenes ? `, scenes: ${o.scenes}` : ''}`, {step: 'background'});
   res.json({ok: true});
 }));
 // ---------- look & feel: chosen before the concepts (project.look), layer part mirrored to src/studio/<id>/look.json ----------
@@ -759,6 +829,7 @@ app.post('/api/projects/:id/look/apply', wrap(async (req, res) => {
   const changes = lookChanges(p.look);
   if (!changes.length) return res.json({ok: true, none: true});
   startTurn(p, lookChangePrompt(p.look, changes, compId(p.id)), `Apply look changes: ${changes.map((c) => c.key).join(', ')}`, {
+    step: 'look',
     before: {look: {...p.look, applied: {levels: builtLevels(p.look)}}},
   });
   res.json({ok: true});
@@ -785,7 +856,7 @@ app.put('/api/projects/:id/style', wrap(async (req, res) => {
 }));
 app.post('/api/projects/:id/make-style-editable', wrap(async (req, res) => {
   const p = need(req.params.id);
-  startTurn(p, stylePrompt(p), 'Move the colours into style.json so they are editable in the browser');
+  startTurn(p, stylePrompt(p), 'Move the colours into style.json so they are editable in the browser', {step: 'style'});
   res.json({ok: true});
 }));
 // live controls of the background layer Claude built: src/studio/<id>/background.json {enabled, opacity, speed}
@@ -856,6 +927,7 @@ app.put('/api/settings', wrap(async (req, res) => {
     if (dir) fs.mkdirSync(dir, {recursive: true});
     s.outDir = dir ? path.resolve(dir) : '';
   }
+  if (TRANSCRIBE_MODES.includes(req.body.transcribeMode)) s.transcribeMode = req.body.transcribeMode;
   writeSettings(s);
   if (req.body.ai) updateAi(req.body.ai);
   res.json(publicSettings());
@@ -874,8 +946,8 @@ app.post('/api/settings/test-ai', wrap(async (req, res) => {
 // native folder picker (a web page can't see real paths)
 app.post('/api/settings/pick-folder', wrap(async (req, res) => {
   if (process.platform !== 'win32') throw Object.assign(new Error('Type the folder path instead.'), {status: 400});
-  const start = (readSettings().outDir || os.homedir()).replace(/'/g, "''");
-  const ps = `Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Where should rendered videos go?'; $f.SelectedPath = '${start}'; $o = New-Object System.Windows.Forms.Form -Property @{TopMost = $true}; if ($f.ShowDialog($o) -eq 'OK') { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $f.SelectedPath }`;
+  const start = String(req.body?.start || readSettings().outDir || os.homedir()).replace(/'/g, "''"), what = String(req.body?.description || 'Where should rendered videos go?').replace(/'/g, "''");
+  const ps = `Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = '${what}'; $f.SelectedPath = '${start}'; $o = New-Object System.Windows.Forms.Form -Property @{TopMost = $true}; if ($f.ShowDialog($o) -eq 'OK') { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $f.SelectedPath }`;
   const dir = await new Promise((ok, fail) => execFile('powershell.exe', ['-NoProfile', '-STA', '-Command', ps], {windowsHide: true}, (e, out) => (e ? fail(e) : ok(String(out).trim()))));
   res.json({outDir: dir || null});
 }));

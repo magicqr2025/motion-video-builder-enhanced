@@ -1,0 +1,25 @@
+{
+  "voiceover": {
+    "src": "studio/untitled-video-3/voiceover.mp3",
+    "volume": 1,
+    "muted": false,
+    "startSec": 0,
+    "trimStartSec": 0,
+    "trimEndSec": null,
+    "durationSec": 71.39
+  },
+  "music": {
+    "src": null,
+    "volume": 0.25,
+    "muted": false,
+    "startSec": 0,
+    "trimStartSec": 0,
+    "trimEndSec": null,
+    "durationSec": null,
+    "loop": true,
+    "fadeInSec": 1,
+    "fadeOutSec": 2,
+    "duck": true,
+    "duckLevel": 0.35
+  }
+}

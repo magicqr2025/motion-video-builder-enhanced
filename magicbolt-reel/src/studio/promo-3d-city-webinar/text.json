@@ -1,0 +1,23 @@
+{
+  "Hook": {"line1": "क्या आपकी भी leads,", "line2": "Excel sheet में", "line3": "आराम कर रही हैं?", "sheet": "leads.xlsx", "rows": ["Rahul S.", "Priya M.", "Amit K.", "Neha R.", "Vikas T."], "status": "No follow-up"},
+  "Ads": {"headline": "Ads पर पैसा लगाते हो", "lead": "New lead · Rahul S.", "leadSub": "Facebook ad से आई", "call": "Call · एक बार बात", "callSub": "00:42", "ended": "Call ended", "after": "फिर बात वहीं ख़त्म"},
+  "FollowUp": {"intro": "लेकिन सच ये है", "line": "Convert होने के लिए", "suffix": "x", "follow": "Follow-up चाहिए", "steps": ["Call", "Follow-up 2", "Follow-up 3", "Follow-up 4"], "once": "एक बार बात करके", "retarget": "Retarget", "cant": "दोबारा नहीं कर पाते"},
+  "Example": {"intro": "एक example से समझते हैं", "title": "Ad चलाया →", "ad": "Ad चलाया", "count": "Leads आईं", "converted": "Convert", "wasted": "Waste", "money": "पैसा पूरी 10 leads का"},
+  "Waste": {"question": "बाक़ी 7 leads?", "excel": "Excel में पड़ी", "phone": "Staff के phone में", "waste": "पैसा सीधा waste"},
+  "Solution": {"problem": "यही problem solve करता है", "brand": "Way CRM", "sub": "Complete AI Automation Software", "n1": "WhatsApp automation", "n1sub": "Lead तुरंत nurture", "n2": "AI calling agent", "n2sub": "सही pitch, converted", "n3": "Sales pipeline", "n3sub": "Retarget later"},
+  "Features": {
+    "f1": "WhatsApp Automation", "f1sub": "नई lead तुरंत manage + nurture",
+    "f2": "AI Calling Agents", "f2sub": "सही pitch के साथ convert",
+    "f3": "Complete Sales Pipeline", "f3sub": "Reply नहीं? Lead फिर भी safe",
+    "f4": "Future Retarget", "f4sub": "हर lead दोबारा reach करो",
+    "stages": ["New", "Nurture", "AI Call", "Won"],
+    "n1": "WhatsApp · Hi Rahul!", "n1sub": "Auto reply in 2 sec",
+    "n2": "AI Call · Priya M.", "n2sub": "Interested → Demo booked",
+    "n3": "Pipeline · Amit K.", "n3sub": "Moved to Nurture",
+    "toggle": "Retarget on",
+    "chat": {"name": "Rahul S.", "status": "Way CRM auto-reply · online", "msgs": ["Hi, price kya hai?", "Hi Rahul! Way CRM में आपका swagat है", "Ye rahi details + demo link", "Demo book kar do", "Done! Kal 11 AM confirmed"]}
+  },
+  "Result": {"question": "Result?", "conv": "ज़्यादा conversions", "suffix": "x", "line": "Sales & revenue grow का chance", "team": "Team हमेशा productive", "cta": "Signup kro", "site": "waycrm.in", "by": "Way CRM by"},
+  "End": {"brand": "Way CRM", "by": "by MagicBolt AI", "cta": "अभी signup करो", "site": "waycrm.in"},
+  "_help": {"Hook.line2": "max ~18 chars", "Solution.brand": "product name", "End.site": "website shown on the CTA", "Features.stages": "4 short pipeline stages"}
+}

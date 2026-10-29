@@ -32,5 +32,7 @@
     "A @remotion/three city scene with a scripted camera path (cam.ts); 2D overlays anchored to 3D points (Anchor).",
     "Big gradient headlines with halo, Gloss buttons, Burst / Rays / Swipe / FlashW transitions, Seg sub-sequences.",
     "Rendering needs the angle GL renderer (already in remotion.config.ts and the studio renderer)."
-  ]
+  ],
+  "hidden": true,
+  "hiddenReason": "The 3D city scene (three.js city fly-through) is switched off for new videos: it renders very slowly. 3D objects and glossy 3D icons are still fine. Remove \"hidden\" to bring it back."
 }

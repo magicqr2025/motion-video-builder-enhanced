@@ -1,0 +1,5 @@
+{
+  "colors": {"NAVY": "#0E1B4D", "DEEP": "#1354BC", "BLUE": "#1582D5", "GOLD": "#FDC60B", "ORANGE": "#F7941D", "SLATE": "#5A6488"},
+  "_defaults": {"NAVY": "#0E1B4D", "DEEP": "#1354BC", "BLUE": "#1582D5", "GOLD": "#FDC60B", "ORANGE": "#F7941D", "SLATE": "#5A6488"},
+  "_labels": {"NAVY": "Headlines & dark backgrounds", "DEEP": "Gradient headline end, glass glows", "BLUE": "Accents & frames", "GOLD": "CTA pill & highlights", "ORANGE": "AI Calling accent & CTA gradient", "SLATE": "Sub-lines & small text"}
+}

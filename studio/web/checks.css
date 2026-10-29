@@ -1,0 +1,23 @@
+/* Script checks under the Story card: score and stronger hooks */
+.st-checks { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.st-res { display: grid; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); margin-top: 8px; }
+.st-res-head { display: flex; align-items: center; gap: 14px; }
+.st-res-head > div { flex: 1; min-width: 0; display: grid; gap: 2px; line-height: 1.4; }
+.st-big { font-size: 34px; font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.st-big small { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 2px; letter-spacing: 0; }
+.st-big.good, .st-part i.good u { color: var(--green); }
+.st-big.ok, .st-part i.ok u { color: #d98a00; }
+.st-big.low, .st-part i.low u { color: var(--red); }
+.st-parts { display: grid; gap: 8px; }
+.st-part { display: grid; grid-template-columns: 112px 110px 24px minmax(0, 1fr); gap: 4px 10px; align-items: center; font-size: 12.5px; }
+.st-part > span { font-weight: 600; }
+.st-part > b { text-align: right; font-variant-numeric: tabular-nums; }
+.st-part > small { color: var(--slate); font-size: 12px; line-height: 1.4; }
+.st-part i { display: block; height: 7px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.st-part i u { display: block; height: 100%; background: currentColor; text-decoration: none; border-radius: 99px; }
+.st-fixes { font-size: 13px; line-height: 1.5; }
+.st-fixes ol { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 3px; }
+.st-hook { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.st-hook > div { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.st-hook .pill { font-size: 10.5px; }
+@media (max-width: 720px) { .st-part { grid-template-columns: 96px 1fr 24px; } .st-part > small { grid-column: 1 / -1; } .st-hook { flex-direction: column; align-items: stretch; } }

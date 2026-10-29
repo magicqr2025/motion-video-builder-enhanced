@@ -1,0 +1,49 @@
+/* Library, Video tools, Storage, Decks, Activity (V2) */
+.lstats { display: flex; flex-wrap: wrap; gap: 10px 40px; margin-top: 16px; } .lstats > div { display: grid; line-height: 1.1; } .lstats span { font-size: 12px; color: var(--mut); }
+.tw { overflow-x: auto; } .atable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.atable th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); padding: 8px 10px; white-space: nowrap; }
+.atable td { padding: 11px 10px; border-top: 1px solid var(--line); vertical-align: top; } .atable .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.atable tbody tr:hover { background: rgba(255,255,255,.03); }
+
+/* library */
+.lrow { display: grid; grid-template-columns: 170px minmax(0, 1fr) 220px; gap: 14px 18px; align-items: start; padding: 14px; border-radius: 22px; }
+@media (max-width: 900px) { .lrow { grid-template-columns: 1fr; } }
+.lthumb { position: relative; width: 170px; aspect-ratio: 16/9; border: 0; padding: 0; border-radius: 14px; overflow: hidden; cursor: pointer; display: grid; place-items: center; color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.lthumb:disabled { cursor: default; } .lthumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lthumb .pl { position: relative; width: 40px; height: 40px; border-radius: 50%; background: rgba(10,11,32,.65); display: grid; place-items: center; opacity: 0; transition: opacity .2s; } .lthumb:hover .pl, .lthumb:focus-visible .pl { opacity: 1; }
+.lthumb .np { position: relative; font-size: 11.5px; color: rgba(255,255,255,.75); }
+.lmain { display: flex; flex-direction: column; gap: 8px; min-width: 0; } .lside { display: flex; flex-direction: column; gap: 9px; align-items: flex-start; }
+.ltitle { font-weight: 600; font-size: 15px; } .ltitle:hover { text-decoration: underline; }
+.ldetail { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+/* tools */
+.tjgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 18px; margin-top: 14px; } @media (max-width: 900px) { .tjgrid { grid-template-columns: 1fr; } }
+.stamps { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow: auto; font-size: 13px; } .stamps div { display: flex; gap: 12px; } .stamps time { color: var(--lav); font-variant-numeric: tabular-nums; flex: none; }
+
+/* storage */
+.sgrow { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line); } .sgrow:last-child { border-bottom: 0; padding-bottom: 0; }
+.sgbar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: rgba(255,255,255,.07); } .sgbar i { display: block; height: 100%; }
+.sgleg { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; color: var(--mut); } .sgleg span { display: inline-flex; align-items: center; gap: 6px; } .sgleg i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* decks */
+.dk { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 20px; align-items: start; } @media (max-width: 900px) { .dk { grid-template-columns: 1fr; } }
+.dk-side { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 12px; }
+.dk-items { display: flex; flex-direction: column; gap: 6px; }
+.dk-item { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 16px; border: 1px solid transparent; transition: background .2s, border-color .2s; } .dk-item:hover { background: rgba(255,255,255,.05); }
+.dk-item.on { background: rgba(139,124,255,.18); border-color: rgba(169,155,255,.5); } .dk-item b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .dk-item small { color: var(--mut); font-size: 11.5px; }
+.dk-chat { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow: auto; padding: 12px; border-radius: 16px; background: rgba(0,0,0,.22); }
+.dk-msg { padding: 9px 13px; border-radius: 14px; font-size: 13px; background: rgba(255,255,255,.06); max-width: 88%; } .dk-msg.user { align-self: flex-end; background: rgba(139,124,255,.25); } .dk-msg.error { background: rgba(255,122,134,.15); color: #FFB3BA; } .dk-msg.done { background: rgba(94,242,166,.12); }
+.dk-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.dk-file { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.dk-th { flex: none; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,.3); display: grid; place-items: center; font-size: 11px; color: var(--mut); text-transform: uppercase; } .dk-th img { width: 100%; height: 100%; object-fit: cover; }
+
+/* scripts & voiceovers library */
+.vgrid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 18px; } @media (max-width: 560px) { .vgrid2 { grid-template-columns: 1fr; } }
+.vitem { display: flex; flex-direction: column; gap: 12px; padding: 20px 22px; }
+.vscript { font-size: 13px; line-height: 1.6; color: var(--soft); white-space: pre-wrap; max-height: 5.2em; overflow: hidden; position: relative; } .vscript.open { max-height: none; }
+.vscript:not(.open)::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.6em; background: linear-gradient(180deg, transparent, rgba(24,25,60,.9)); }
+.vcand { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,.04); border: 1px solid var(--line); cursor: pointer; } .vcand[hidden] { display: none; }
+.vcand input { width: 17px; height: 17px; accent-color: #8B7CFF; }
+.vclip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+dialog.vldlg { background: linear-gradient(160deg, #1a1b48, #12132f); color: var(--ink); border: 1px solid var(--line2); border-radius: 26px; padding: 26px 28px; width: min(620px, 92vw); max-height: 92vh; overflow: auto; box-shadow: 0 30px 80px rgba(0,0,0,.6); font-family: inherit; }
+dialog.vldlg::backdrop { background: rgba(6,7,22,.72); }

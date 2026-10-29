@@ -1,0 +1,20 @@
+{
+  "grain": 0,
+  "vignette": 1,
+  "grade": 1,
+  "gradeMood": "cool",
+  "leaks": 0,
+  "motionBlur": 0,
+  "sfx": 1,
+  "sceneStarts": [
+    0,
+    3.2,
+    9.3,
+    20.1,
+    30,
+    37.7,
+    43.2,
+    60.5,
+    68.1
+  ]
+}

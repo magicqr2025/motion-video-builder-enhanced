@@ -8,3 +8,5 @@ export * from './actions';
 export * from './focus';
 export * from './captions';
 export * from './objects3d';
+export * from './textfx';
+export * from './layouts';

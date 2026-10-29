@@ -1,0 +1,4 @@
+/* "AI" badge on the step tabs the AI has worked on */
+.tabs button { position: relative; }
+.tabs .ai-badge { position: absolute; top: -7px; right: -5px; display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px 1px 4px; border-radius: 99px; font-style: normal; font-size: 9px; font-weight: 700; letter-spacing: .03em; line-height: 14px; color: #3d2a00; background: linear-gradient(135deg, #FFE27A, #FDC60B); box-shadow: 0 1px 3px rgba(120, 80, 0, .35); pointer-events: none; }
+.tabs .ai-badge svg { width: 9px; height: 9px; fill: currentColor; }

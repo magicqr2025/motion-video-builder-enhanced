@@ -1,0 +1,28 @@
+/* Voiceover panel (ElevenLabs) under the Story card */
+.vo-card { margin-top: 12px; padding: 16px 18px; display: grid; gap: 12px; }
+.vo-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vo-head b { font-size: 15px; }
+.vo-link { font: inherit; font-size: 12px; font-weight: 600; background: none; border: 0; padding: 0 2px; color: var(--deep); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.vo-head .vo-link { margin-left: auto; color: var(--muted); }
+.vo-lead { margin: 0; line-height: 1.5; }
+.vo-key { display: flex; gap: 8px; max-width: 520px; }
+.vo-key input { flex: 1; min-width: 0; }
+.vo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; align-items: start; }
+.vo-pad { padding: 9px 0; }
+
+.vo-tags { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.vo-tags-head { font-size: 12.5px; line-height: 1.45; }
+.vo-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.vo-gn { width: 62px; flex: none; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.vo-chip { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--card); color: var(--slate); cursor: pointer; }
+.vo-chip::before { content: "["; opacity: .45; }
+.vo-chip::after { content: "]"; opacity: .45; }
+.vo-chip:hover, .vo-chip:focus-visible { border-color: var(--deep); color: var(--ink); }
+.vo-custom { display: flex; gap: 8px; max-width: 380px; }
+.vo-custom input { flex: 1; min-width: 0; height: 34px; font-size: 12.5px; padding: 5px 10px; }
+
+.vo-result { display: grid; gap: 8px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.vo-result audio { width: 100%; max-width: 560px; height: 40px; }
+.vo-meta { font-variant-numeric: tabular-nums; }
+.vo-card .st-err { margin: 0; }
+@media (max-width: 640px) { .vo-gn { width: 100%; } }

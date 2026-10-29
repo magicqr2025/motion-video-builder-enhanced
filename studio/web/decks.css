@@ -1,0 +1,81 @@
+/* Visual PPT page (decks.js) */
+.dk { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 18px; align-items: start; height: 100%; }
+.dk-side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; max-height: 100%; }
+.dk-lh h2 { font-size: 20px; }
+.dk-items { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.dk-item { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; }
+.dk-item:hover { border-color: #b9cffb; background: #f4f8ff; }
+.dk-item.on { border-color: var(--deep); background: #edf3ff; box-shadow: 0 0 0 2px rgba(19, 84, 188, .12); }
+.dk-item.gone { opacity: .65; }
+.dk-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: linear-gradient(180deg, #1D8FE6, var(--deep)); color: #fff; font-size: 16px; flex: none; }
+.dk-tx { min-width: 0; display: flex; flex-direction: column; }
+.dk-tx b { font-size: 13px; line-height: 1.25; overflow-wrap: anywhere; }
+.dk-tx small { font-size: 11.5px; color: var(--muted); }
+.dk-add { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px dashed #b9cffb; border-radius: 12px; background: #f7faff; }
+.dk-err { color: var(--red); font-size: 12.5px; font-weight: 600; }
+
+.dk-right { min-width: 0; height: 100%; overflow: auto; padding-right: 4px; }
+.dk-detail { display: flex; flex-direction: column; gap: 16px; padding-bottom: 40px; }
+.dk-card { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.dk-head { align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.dk-view { gap: 8px; flex-wrap: wrap; }
+.dk-card .f { display: flex; flex-direction: column; gap: 5px; }
+.dk-card .f > span { font-size: 12px; font-weight: 600; color: var(--slate); }
+.dk-card input[type=text], .dk-card input[type=number], .dk-card input:not([type]), .dk-card textarea, .dk-card select, .dk-add input { font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); width: 100%; }
+.dk-card textarea { resize: vertical; }
+.dk-card input:focus, .dk-card textarea:focus, .dk-card select:focus, .dk-add input:focus { outline: 2px solid rgba(19, 84, 188, .28); border-color: var(--deep); }
+.dk-vers { display: flex; flex-direction: column; gap: 8px; }
+.dk-ver { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.dk-addver { gap: 8px; flex-wrap: wrap; }
+.dk-addver select { width: auto; min-width: 200px; }
+.dk-save { gap: 12px; align-items: center; flex-wrap: wrap; }
+.dk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+
+.dk-up { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 2px dashed #c9d8f6; border-radius: 14px; background: #f7faff; transition: background .15s, border-color .15s; }
+.dk-up.over { background: #e6f0ff; border-color: var(--deep); }
+.dk-up select { width: auto; max-width: 320px; }
+.dk-q { font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; width: 100%; background: #fff; color: var(--ink); }
+.dk-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; max-height: 520px; overflow: auto; }
+.dk-file { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.dk-th { width: 48px; height: 48px; border-radius: 9px; background: #eef2fb; display: grid; place-items: center; overflow: hidden; }
+.dk-th img { width: 100%; height: 100%; object-fit: contain; }
+.dk-ext { font-size: 10.5px; font-weight: 700; color: var(--slate); text-transform: uppercase; }
+.dk-fn { min-width: 0; display: flex; flex-direction: column; }
+.dk-fn b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-fn small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-fa { display: flex; gap: 4px; }
+.dk-more { gap: 10px; }
+.dk-path { padding: 7px 10px; border-radius: 8px; background: #eef2fb; font-size: 12px; overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.dk-danger { gap: 12px; align-items: center; flex-wrap: wrap; padding-top: 6px; border-top: 1px solid var(--line); }
+.dk-empty { padding: 40px; text-align: center; }
+
+@media (max-width: 900px) {
+  .dk { grid-template-columns: 1fr; height: auto; }
+  .dk-side { position: static; }
+  .dk-right { overflow: visible; height: auto; }
+  .dk-ver { grid-template-columns: 1fr auto; }
+  .dk-ver select { grid-column: 1; }
+}
+
+/* online decks, extra links, the Claude chat */
+.dk-leftcol { min-width: 0; }
+.dk-ic.on { background: linear-gradient(180deg, #8b5cf6, #6d3fe0); }
+.dk-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 3px; border-radius: 10px; background: #e8eefb; }
+.dk-seg button { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--slate); cursor: pointer; }
+.dk-seg button.on { background: #fff; color: var(--deep); box-shadow: 0 1px 3px rgba(19, 40, 120, .15); }
+.dk-links { display: flex; flex-direction: column; gap: 8px; }
+.dk-lrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto; gap: 8px; align-items: center; }
+.dk-lrow input { font: inherit; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); width: 100%; }
+.dk-chat { display: flex; flex-direction: column; gap: 8px; max-height: 360px; min-height: 90px; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: #f7faff; }
+.dk-empty-chat { padding: 18px 6px; text-align: center; }
+.dk-msg { padding: 9px 13px; border-radius: 12px; font-size: 13px; line-height: 1.5; max-width: 88%; overflow-wrap: anywhere; }
+.dk-msg.user { align-self: flex-end; background: linear-gradient(180deg, #1D8FE6, var(--deep)); color: #fff; border-bottom-right-radius: 4px; }
+.dk-msg.text { align-self: flex-start; background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.dk-msg.done { align-self: flex-start; background: #e2f6e9; color: #0f6b34; border: 1px solid #bfe8cd; }
+.dk-msg.error { align-self: flex-start; background: #fdecec; color: #a3262b; border: 1px solid #f6c6c8; }
+.dk-steps { align-self: flex-start; font-size: 11.5px; color: var(--muted); padding: 2px 6px; line-height: 1.6; }
+.dk-working { display: flex; align-items: center; gap: 6px; color: var(--deep); font-weight: 600; }
+#dk-chatmsg { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; width: 100%; resize: vertical; background: #fff; color: var(--ink); }
+@media (max-width: 900px) { .dk-lrow { grid-template-columns: 1fr auto; } .dk-lrow input:nth-child(2) { grid-column: 1; } .dk-msg { max-width: 100%; } }
+
+.dk-head > div:first-child { flex: 1 1 280px; min-width: 280px; }

@@ -99,6 +99,24 @@ label.f.ai-filled > span::after, .f.ai-filled > .fl::after { font-weight: 500; }
 .tasks li.next small { font-weight: 500; }
 .tasks-ai summary { font-weight: 500; }
 .tasks-ai li.in_progress { font-weight: 500; }
+.tabs .ai-badge { font-weight: 600; }
+.st-big { font-weight: 600; }
+.st-big small { font-weight: 500; }
+.st-part > span { font-weight: 500; }
+.dk-err { font-weight: 500; }
+.dk-card .f > span { font-weight: 500; }
+.dk-ext { font-weight: 600; }
+.dk-seg button { font-weight: 500; }
+.dk-working { font-weight: 500; }
+.dup-box .fl { font-weight: 600; }
+.lb-stats b { font-weight: 500; }
+.lb-fmt { font-weight: 500; }
+.lb-title { font-weight: 500; }
+.lb-fn { font-weight: 400; }
 .lg-brand h1 { font-weight: 500; }
 .lg-f > span:first-child { font-weight: 400; }
 .lg-go { font-weight: 400; }
+
+.vo-link { font-weight: 500; }
+.vo-gn { font-weight: 500; }
+.vo-chip { font-weight: 500; }

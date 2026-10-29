@@ -2,11 +2,12 @@
 // One short text-only AI call per action (no tools, no project chat session), so it is quick and cheap.
 import {query} from '@anthropic-ai/claude-agent-sdk';
 import {STUDIO} from './paths.mjs';
-import {getProject, saveProject} from './projects.mjs';
+import {getProject, saveProject, markAiStep} from './projects.mjs';
 import {aiConfig, aiRuntime} from './settings.mjs';
 import {startProcess, endProcess, addProcessTokens, activityLog} from './activity.mjs';
 import {claudeEnv, runAgent} from './agent.mjs';
 import {LOOK_SPEC} from './look.mjs';
+import {stripAudioTags} from './voice.mjs';
 
 export const STORY_LANGS = ['English', 'Hinglish', 'Hindi', 'Hindi + English captions'];
 export const STORY_CAPTIONS = ['word-by-word pill', 'step pill', 'kinetic big lines', 'subtitles', 'none'];
@@ -26,12 +27,13 @@ const scriptRules = (b) => `Rules for the script:
 - It is the spoken voiceover only. One sentence per line. No scene headings, no stage directions, no emojis, no hashtags, no quotation marks around it.
 - Open with a hook in the first line. Finish with the call to action if one is given or obvious.
 - Language: ${b.language || 'English'}${/hinglish/i.test(b.language || '') ? ' (Hindi words written in English letters)' : ''}.
+- Square-bracket audio tags such as [whispers] or [pause] are delivery cues for the voice engine, not spoken words. Keep every one that is already in the text, in place. Do not add new ones.
 - Length: about ${b.durationSec ? `${b.durationSec} seconds (~${Math.round(b.durationSec * WORDS_PER_SEC)} words)` : '45 to 60 seconds (~110 to 150 words)'}.`;
 
 const PROMPTS = {
   script: (b) => `Write a voiceover script for a video.\n\n${ctxLines(b)}\n\n${scriptRules(b)}\n${b.instruction ? `\nThe previous draft was not right. Change this: ${b.instruction}\nPrevious draft:\n${b.script}\n` : ''}\nReply with only the script.`,
   improve: (b) => `Improve this voiceover script. Keep every fact and claim, keep its meaning and language${b.instruction ? '' : ', make it tighter, more natural when spoken, with a stronger hook and a clear ending'}.\n${b.instruction ? `Specific request: ${b.instruction}\n` : ''}\n${ctxLines({...b, idea: b.idea})}\n\n${scriptRules(b)}\n\nCurrent script:\n${b.script}\n\nReply with only the improved script.`,
-  fill: (b) => `Read this approved voiceover script and fill in the whole video brief that goes with it.\n\n${ctxLines(b)}\n\nScript:\n${b.script}\n\nReturn ONLY a JSON object with these keys:
+  fill: (b) => `Read this approved voiceover script and fill in the whole video brief that goes with it.\n\n${ctxLines(b)}\n\nScript:\n${stripAudioTags(b.script)}\n\nReturn ONLY a JSON object with these keys:
 {"title": "a short video title, 2 to 6 words",
  "idea": "one sentence: what the video is and what it should achieve",
  "audience": "who it is for, short",
@@ -42,6 +44,8 @@ const PROMPTS = {
  "captions": "exactly one of: ${STORY_CAPTIONS.join(' | ')}",
  "notes": "up to 3 short do / don't lines for the designer, inferred from the tone and content (pacing, what to emphasise). Empty string if nothing is implied"}
 Use only what the script and the context support; leave a value as an empty string if you cannot tell.`,
+  score: (b) => `Score this short-form video voiceover script as a strict but fair reel coach. Judge only the text; never invent facts.\n\n${ctxLines(b)}\n\nScript (spoken text only):\n${stripAudioTags(b.script)}\n\nReturn ONLY a JSON object:\n{"score": <0-100 overall>, "verdict": "one plain sentence",\n "parts": [{"name": "Hook", "score": <0-10>, "note": "short"}, {"name": "Clarity", ...}, {"name": "Pacing", ...}, {"name": "Payoff", ...}, {"name": "Call to action", ...}, {"name": "Sounds spoken", ...}],\n "fixes": ["the 3 most valuable changes, most important first, each one short and concrete"]}\nThe first line is the hook: it must earn the next 3 seconds. Be specific, quote the line you mean. Plain English notes.`,
+  hooks: (b) => `Write 6 alternative opening lines (hooks) for this voiceover script. Each must work as the very first spoken line, make sense with the rest of the script, and use a different hook formula (e.g. bold claim, question, number, mistake, contrast, curiosity gap, direct call-out). Never invent facts, numbers or claims that are not in the material.\n\n${ctxLines(b)}\n\nScript (spoken text only):\n${stripAudioTags(b.script)}\n\nWrite each hook in ${b.language || 'English'}${/hinglish/i.test(b.language || '') ? ' (Hindi words in English letters)' : ''}, under 14 words, spoken style, no emojis, no quotation marks.\nReturn ONLY a JSON object: {"hooks": [{"line": "the hook", "formula": "formula name", "why": "one short plain-English reason it works here"}]}`,
   look: (b, spec) => `Choose the visual "look & feel" options for a video. Be selective: more options means a longer, costlier build and a busier video, so only switch on what truly suits this video.\n\n${ctxLines(b)}\n${b.script ? `\nScript:\n${b.script}\n` : ''}\nOptions (level 0 = off, 1 = light, 2 = full):\n${spec.items.map((i) => `- ${i.key}: ${i.title}. ${i.desc}`).join('\n')}\n\nReady-made styles for reference: ${spec.bundles.map((x) => `${x.name} (${x.tagline})`).join('; ')}.\nCalm how-to / tutorial videos want few, subtle options. Short social reels can take bolder motion.\n\nReturn ONLY a JSON object:\n{"levels": {${spec.items.map((i) => `"${i.key}": 0`).join(', ')}}, "gradeMood": "one of: ${spec.moods.join(' | ')}", "reason": "two short plain sentences telling a non-technical person why you chose this"}`,
 };
 
@@ -49,7 +53,7 @@ Use only what the script and the context support; leave a value as an empty stri
 // `tools: []` alone still sends every built-in tool definition (~11k tokens); disallowing them by name cuts a call to ~1k.
 const NO_TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'Task', 'Agent', 'TodoWrite', 'BashOutput', 'KillShell', 'ExitPlanMode'];
 // Writing a short script does not need the biggest model: use the one chosen on the home page, else Sonnet.
-const storyModel = (cfg) => cfg.model || process.env.STUDIO_STORY_MODEL || 'claude-sonnet-5-5';
+const storyModel = (cfg) => cfg.model || process.env.STUDIO_STORY_MODEL || 'claude-opus-5-5';
 const askClaude = async (prompt, {signal, cfg}) => {
   const ac = new AbortController();
   signal.addEventListener('abort', () => ac.abort(), {once: true});
@@ -118,6 +122,7 @@ export const mountStory = (app, {wrap, need, changed, broadcast}) => {
         const q = getProject(p.id);
         return {q, done: () => {
           if (r.cost) q.cost = (q.cost ?? 0) + r.cost;
+          markAiStep(q, 'brief');
           saveProject(q); changed(q.id);
           addProcessTokens(proc, {input: r.input, output: r.output}, r.cost);
           endProcess(proc, {status: 'done'});
@@ -134,7 +139,18 @@ export const mountStory = (app, {wrap, need, changed, broadcast}) => {
 
   app.post('/api/projects/:id/story/assist', wrap(async (req, res) => {
     const p = need(req.params.id), action = req.body.action;
-    if (!['script', 'improve', 'fill'].includes(action)) throw Object.assign(new Error('Unknown story action.'), {status: 400});
+    if (!['script', 'improve', 'fill', 'score', 'hooks'].includes(action)) throw Object.assign(new Error('Unknown story action.'), {status: 400});
+    if (action === 'score' || action === 'hooks') { // read-only checks: they never change the brief or the script
+      const sb = {...p.brief, ...(req.body.brief ?? {})};
+      if (!stripAudioTags(sb.script).trim()) throw Object.assign(new Error('There is no script yet.'), {status: 400});
+      const {r, finish} = await aiCall(req, res, p, action === 'score' ? 'Story · score the script' : 'Story · find stronger hooks', PROMPTS[action](sb), {json: true});
+      const out = parseJson(r.text), str = (v, n) => String(v ?? '').trim().slice(0, n);
+      const {done} = finish();
+      const usage = {...done(), action};
+      if (action === 'hooks') return res.json({hooks: (Array.isArray(out.hooks) ? out.hooks : []).map((h) => ({line: str(h.line, 160), formula: str(h.formula, 40), why: str(h.why, 200)})).filter((h) => h.line).slice(0, 8), usage});
+      const num = (v, hi) => Math.max(0, Math.min(hi, Math.round(Number(v)) || 0));
+      return res.json({score: num(out.score, 100), verdict: str(out.verdict, 240), parts: (Array.isArray(out.parts) ? out.parts : []).map((x) => ({name: str(x.name, 30), score: num(x.score, 10), note: str(x.note, 240)})).filter((x) => x.name).slice(0, 8), fixes: (Array.isArray(out.fixes) ? out.fixes : []).map((f) => str(f, 240)).filter(Boolean).slice(0, 5), usage});
+    }
     const b = {...p.brief, ...(req.body.brief ?? {}), instruction: String(req.body.instruction ?? '').trim()};
     if (action === 'script' && !String(b.idea ?? '').trim() && !(b.instruction && b.script)) throw Object.assign(new Error('Write your idea first.'), {status: 400});
     if ((action === 'improve' || action === 'fill') && !String(b.script ?? '').trim()) throw Object.assign(new Error('There is no script yet.'), {status: 400});
@@ -147,7 +163,7 @@ export const mountStory = (app, {wrap, need, changed, broadcast}) => {
     const {q, done} = finish(), brief = {...q.brief}, filled = [];
     if (action === 'fill') {
       const out = parseJson(r.text), redo = !!req.body.overwrite;
-      const words = (String(b.script).match(/\S+/g) ?? []).length;
+      const words = (stripAudioTags(b.script).match(/\S+/g) ?? []).length;
       const empty = (k) => !String(brief[k] ?? '').trim();
       const set = (k, v) => { const val = Array.isArray(v) ? v.join('\n') : String(v ?? '').trim(); if (val && (redo || empty(k))) { brief[k] = val; filled.push(k); } };
       set('idea', out.idea); set('audience', out.audience); set('cta', out.cta); set('onScreen', out.onScreen); set('style', out.style); set('notes', out.notes);

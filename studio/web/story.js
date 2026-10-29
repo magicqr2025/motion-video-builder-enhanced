@@ -1,6 +1,7 @@
 // Story assistant on the Brief page:
 //   idea  -> AI writes a script -> you review -> approve -> AI fills audience / CTA / language / on-screen text
 //   script -> improve with AI (or use as it is) -> review -> approve -> same
+import {stripTags} from './voice.js';
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 
@@ -13,7 +14,7 @@ export const storyRunning = () => ST.busy;
 export const stopStoryRun = () => ST.ctrl?.abort();
 
 const WPS = 2.5; // words per second of voiceover
-const words = (t) => (String(t ?? '').trim().match(/\S+/g) ?? []).length;
+const words = (t) => (stripTags(t).match(/\S+/g) ?? []).length; // audio tags are voice cues, not spoken words
 const clock = (sec) => { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
 const countText = (t) => { const n = words(t); return n ? `${n} words · about ${clock(n / WPS)} spoken` : 'Nothing written yet'; };
 const brief = () => C.S.cur.project.brief;
@@ -21,8 +22,22 @@ const brief = () => C.S.cur.project.brief;
 const phase = (b) => !String(b.script ?? '').trim() ? 'start' : b.scriptState === 'approved' || (b.scriptState === undefined && C.S.cur.project.status !== 'brief') ? 'approved' : b.scriptState === 'review' ? 'review' : 'start';
 const mode = (b) => b.storyMode ?? (String(b.script ?? '').trim() && !String(b.idea ?? '').trim() ? 'script' : 'idea');
 
-const RUN_TEXT = {script: 'Writing your script…', improve: 'Improving your script…', fill: 'Reading the script and filling in the details…'};
-const TYPICAL = {script: '10 to 30 s', improve: '10 to 30 s', fill: '5 to 15 s'};
+const RUN_TEXT = {script: 'Writing your script…', improve: 'Improving your script…', fill: 'Reading the script and filling in the details…', score: 'Scoring your script…', hooks: 'Looking for stronger hooks…'};
+const TYPICAL = {script: '10 to 30 s', improve: '10 to 30 s', fill: '5 to 15 s', score: '5 to 15 s', hooks: '5 to 15 s'};
+
+// Score / hooks: read-only checks under the script. Results stay until the project changes; a note says when the script has moved on.
+const band = (n, hi) => { const p = n / hi * 100; return p >= 80 ? 'good' : p >= 60 ? 'ok' : 'low'; };
+const stale = (res, b) => (res && res.of !== String(b.script ?? '').trim() ? '<span class="small muted">The script changed since this check.</span>' : '');
+const checkTools = (b) => words(b.script) ? `<div class="st-checks"><span class="small muted">Check the script</span>
+  <button type="button" class="btn sm" data-story="score" ${dis()}>★ Score it</button>
+  <button type="button" class="btn sm" data-story="hooks" ${dis()}>⚡ Find stronger hooks</button></div>` : '';
+const scoreHTML = (b) => { const s = ST.score; return !s ? '' : `
+  <div class="st-res"><div class="st-res-head"><span class="st-big ${band(s.score, 100)}">${s.score}<small>/100</small></span><div><b>${esc(s.verdict)}</b>${stale(s, b)}</div><button type="button" class="vo-link" data-story="close-score">Hide</button></div>
+    <div class="st-parts">${s.parts.map((x) => `<div class="st-part"><span>${esc(x.name)}</span><i class="${band(x.score, 10)}"><u style="width:${x.score * 10}%"></u></i><b>${x.score}</b><small>${esc(x.note)}</small></div>`).join('')}</div>
+    ${s.fixes.length ? `<div class="st-fixes"><b>Fix first</b><ol>${s.fixes.map((f) => `<li>${esc(f)}</li>`).join('')}</ol></div>` : ''}</div>`; };
+const hooksHTML = (b) => { const h = ST.hooks; return !h ? '' : `
+  <div class="st-res"><div class="st-res-head"><div><b>Stronger opening lines</b>${stale(h, b)}</div><button type="button" class="vo-link" data-story="close-hooks">Hide</button></div>
+    ${h.hooks.length ? h.hooks.map((x, i) => `<div class="st-hook"><div><b>${esc(x.line)}</b><div class="small muted">${x.formula ? `<span class="pill">${esc(x.formula)}</span> ` : ''}${esc(x.why)}</div></div><button type="button" class="btn sm" data-story="usehook" data-i="${i}" ${dis()} title="Replaces the first line of your script with this hook (audio tags on that line are kept)">Use as opening line</button></div>`).join('') : '<div class="small muted">No hooks came back. Try again.</div>'}</div>`; };
 
 export const usageHTML = (u) => usageLine(u);
 const usageLine = (u = ST.usage) => {
@@ -91,7 +106,7 @@ const approved = (b) => {
 
 export const storyHTML = () => {
   const b = brief(), ph = phase(b), m = mode(b), tag = C.aiTag?.();
-  if (ST.pid !== C.S.cur.project.id) { ST.pid = C.S.cur.project.id; ST.usage = null; ST.filled = []; ST.error = ''; }
+  if (ST.pid !== C.S.cur.project.id) { ST.pid = C.S.cur.project.id; ST.usage = null; ST.filled = []; ST.error = ''; ST.score = ST.hooks = null; }
   const body = ph === 'review' ? review(b) : ph === 'approved' ? approved(b) : m === 'script' ? startScript(b) : startIdea(b);
   return `
     <div class="st-top">
@@ -99,7 +114,9 @@ export const storyHTML = () => {
       ${tag ? `<span class="pill ai" title="The model that answers when you press an AI button here">✦ AI · ${esc(tag)}</span>` : ''}
     </div>
     ${body}
+    ${checkTools(b)}
     ${runBar()}
+    ${scoreHTML(b)}${hooksHTML(b)}
     ${ST.error ? `<div class="st-err">${esc(ST.error)}</div>` : ''}
     ${usageLine()}`;
 };
@@ -121,7 +138,9 @@ const run = async (action, extra = {}) => {
   let ok = false;
   try {
     const r = await C.api(`/api/projects/${id}/story/assist`, {method: 'POST', signal: ST.ctrl.signal, body: {action, ...extra}});
-    if (C.S.cur?.project.id === id) {
+    if (action === 'score' || action === 'hooks') { // read-only checks: the script itself is untouched
+      if (C.S.cur?.project.id === id) { ST[action] = {...r, of: extra.brief?.script ?? ''}; ST.usage = r.usage; }
+    } else if (C.S.cur?.project.id === id) {
       C.S.cur.project.brief = r.brief;
       ST.usage = r.usage; ST.filled = action === 'fill' ? r.filled : ST.filled;
       if (r.filled?.includes('style')) { const el = document.querySelector('#brief [name="style"]'); if (el) el.value = r.brief.style; }
@@ -170,6 +189,21 @@ document.addEventListener('click', async (ev) => {
     case 'back': C.setBrief('scriptState', ''); renderStory(); break;
     case 'edit': C.setBrief('scriptState', 'review'); renderStory(); break;
     case 'lang': C.setBrief('language', b.dataset.v); renderStory(); break;
+    case 'score': case 'hooks':
+      if (!text('script')) { C.toast('Write or paste a script first.'); break; }
+      await run(b.dataset.story, {brief: {script: text('script')}}); break;
+    case 'close-score': ST.score = null; renderStory(); break;
+    case 'close-hooks': ST.hooks = null; renderStory(); break;
+    case 'usehook': {
+      const hook = ST.hooks?.hooks[Number(b.dataset.i)], ta = $('#story-card [name="script"]');
+      if (!hook || !ta) break;
+      ta.closest('details')?.setAttribute('open', '');
+      const lines = ta.value.split('\n'), lead = (lines[0].match(/^(?:\s*\[[^\]\n]+\])*\s*/) ?? [''])[0]; // keep audio tags that start the old line
+      lines[0] = `${lead}${hook.line}`;
+      ta.value = lines.join('\n');
+      ta.dispatchEvent(new Event('input', {bubbles: true})); // saves the brief like normal typing
+      C.toast('Opening line replaced. Edit it if you like.'); renderStory(); break;
+    }
     case 'cancel': stopStoryRun(); break;
   }
 });
