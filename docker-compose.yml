@@ -1,4 +1,5 @@
 # MotionStudio on a Linux server. No ports are published: a Cloudflare Tunnel is the only way in, so the server's IP is never exposed.
+# The tunnel reaches the studio over the private compose network (http://studio:4321), so either container can restart on its own.
 # See deploy/DEPLOY.md.
 services:
   studio:
@@ -9,7 +10,7 @@ services:
     shm_size: 1gb # Chrome needs more than Docker's 64 MB default for renders
     user: "${PUID:-1000}:${PGID:-1000}" # the VPS user that owns the repo folder
     environment:
-      HOST: 127.0.0.1 # cloudflared shares this container's network, so localhost is enough
+      HOST: 0.0.0.0 # only reachable inside the compose network: no ports are published to the internet
       PORT: "4321"
       NO_OPEN: "1"
       PREVIEW_HOST: ${PREVIEW_HOST:?set PREVIEW_HOST in .env}
@@ -28,7 +29,6 @@ services:
   tunnel:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    network_mode: "service:studio"
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}

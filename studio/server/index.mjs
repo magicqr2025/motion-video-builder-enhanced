@@ -34,7 +34,7 @@ import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges,
 
 const PORT = Number(process.env.PORT ?? 4321);
 const app = express();
-app.set('trust proxy', 'loopback'); // behind the Cloudflare Tunnel on a server, so the sign-in lock-out sees the visitor's IP
+app.set('trust proxy', 'loopback, uniquelocal'); // behind the Cloudflare Tunnel on a server, so the sign-in lock-out sees the visitor's IP
 const PREVIEW_HOST = process.env.PREVIEW_HOST ?? '';
 // where the browser loads the live preview from: its own hostname on a server, localhost:3100 on a PC
 const PREVIEW_URL = (process.env.PREVIEW_URL || (PREVIEW_HOST ? `https://${PREVIEW_HOST}` : `http://localhost:${STUDIO_PORT}`)).replace(/\/$/, '');

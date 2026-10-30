@@ -1,6 +1,6 @@
 # Running MotionStudio on a Linux VPS
 
-Docker runs the studio and a Cloudflare Tunnel. The VPS opens **no web ports**: visitors reach Cloudflare, Cloudflare reaches the
+Docker runs the studio and a Cloudflare Tunnel (two containers that each restart on their own). The VPS opens **no web ports**: visitors reach Cloudflare, Cloudflare reaches the
 tunnel, and your server's IP never shows. Sign-in is the studio's own admin login.
 
 Two hostnames are used, both pointing at the same tunnel: `studio.example.com` (the app) and `preview.example.com` (the live
@@ -9,7 +9,7 @@ Remotion preview shown inside the app). Both must be under the same domain so th
 ## 1. Cloudflare (once)
 
 1. Zero Trust dashboard > Networks > Tunnels > Create a tunnel > Cloudflared. Name it `motionstudio`. Copy the **token**.
-2. Add two public hostnames to that tunnel, both with service `HTTP` and URL `localhost:4321`:
+2. Add two public hostnames to that tunnel, both with service `HTTP` and URL `studio:4321` (the container name on the private Docker network):
    - `studio.example.com`
    - `preview.example.com`
 3. Do **not** put Cloudflare Access on `preview.example.com`: the preview is loaded inside the app, and an Access login screen cannot
