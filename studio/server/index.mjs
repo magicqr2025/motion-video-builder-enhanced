@@ -19,6 +19,7 @@ import {mountTools} from './tools.mjs';
 import {mountFiles} from './files.mjs';
 import {emptyReview, cleanReview, pendingCount, reviewSummary, clearSent} from './review.mjs';
 import {mountStory, stopStory} from './story.mjs';
+import {mountGuidelines} from './guidelines.mjs';
 import {mountStorage} from './storage.mjs';
 import {mountLibrary} from './library.mjs';
 import {mountDecks} from './decks.mjs';
@@ -36,7 +37,7 @@ const app = express();
 app.set('trust proxy', 'loopback'); // behind the Cloudflare Tunnel on a server, so the sign-in lock-out sees the visitor's IP
 const PREVIEW_HOST = process.env.PREVIEW_HOST ?? '';
 // where the browser loads the live preview from: its own hostname on a server, localhost:3100 on a PC
-const PREVIEW_URL = (process.env.PREVIEW_URL || (PREVIEW_HOST ? `https://${PREVIEW_HOST}` : `http://localhost:${STUDIO_PORT}`)).replace(/[/]$/, '');
+const PREVIEW_URL = (process.env.PREVIEW_URL || (PREVIEW_HOST ? `https://${PREVIEW_HOST}` : `http://localhost:${STUDIO_PORT}`)).replace(/\/$/, '');
 app.use(express.json({limit: '2mb'}));
 
 // Requests for the preview hostname are answered (after a sign-in check) before the studio's own routes.
@@ -311,6 +312,7 @@ const upload = multer({dest: path.join(DATA, '_uploads'), limits: {fileSize: 4 *
 mountFiles(app, {wrap, need, saveProject, appendLog, changed, readStoryboard});
 mountTools(app, {upload, wrap, broadcast, enqueue: (fn) => { mediaQueue = mediaQueue.then(fn).catch((e) => console.error(e)); }});
 mountStory(app, {wrap, need, changed, broadcast});
+mountGuidelines(app, {wrap});
 ensureDarkCss();
 mountStorage(app, {wrap, need, changed, broadcast, busy: () => ({render: renderJob && !renderJob.done ? renderJob.projectId : null, ai: busyList().map((b) => b.id)})});
 mountDecks(app, {wrap});

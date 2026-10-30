@@ -5,7 +5,7 @@ import './voicelib.js'; // the "From library" and "Save to library" buttons are 
 
 const LANGS = ['English', 'Hinglish', 'Hindi', 'Hindi + English captions'];
 const ST = {pid: null, busy: false, action: '', ctrl: null, startedAt: 0, timer: null, usage: null, filled: [], error: '', score: null, hooks: null};
-const RUN = {script: 'Writing your script…', improve: 'Improving your script…', fill: 'Reading the script and filling in the details…', score: 'Scoring your script…', hooks: 'Looking for stronger hooks…'};
+const RUN = {split: 'Splitting your story into script, storyline and visuals…', script: 'Writing your script…', improve: 'Improving your script…', fill: 'Reading the script and filling in the details…', score: 'Scoring your script…', hooks: 'Looking for stronger hooks…'};
 const WPS = 2.5;
 
 let onChange = () => {}; // the Brief page: refresh its summary and readiness
@@ -16,7 +16,7 @@ const brief = () => S.cur.project.brief;
 const set = (k, v) => { brief()[k] = v; queueSave({brief: {[k]: v}}, setState); onChange(); };
 const setState = (t) => { const el = $('#b-state'); if (el) el.textContent = t; };
 const phase = (b) => (!String(b.script ?? '').trim() ? 'start' : b.scriptState === 'approved' || (b.scriptState === undefined && S.cur.project.status !== 'brief') ? 'approved' : b.scriptState === 'review' ? 'review' : 'start');
-const mode = (b) => b.storyMode ?? (String(b.script ?? '').trim() && !String(b.idea ?? '').trim() ? 'script' : 'idea');
+const mode = (b) => b.storyMode ?? (String(b.story ?? '').trim() ? 'story' : String(b.script ?? '').trim() && !String(b.idea ?? '').trim() ? 'script' : 'idea');
 const count = (t) => { const n = words(t); return n ? `${n} words · about ${clock(n / WPS)} spoken` : 'Nothing written yet'; };
 const dis = () => (ST.busy ? 'disabled' : '');
 const text = (name) => String($(`#sec-story [data-b="${name}"]`)?.value ?? brief()[name] ?? '').trim();
@@ -27,12 +27,24 @@ const filled = (key, html) => `<div class="${ST.filled.includes(key) ? 'ai-fille
 
 const steps = (ph) => `<ol class="steps">${[['Idea or script', 'start'], ['Review the script', 'review'], ['Video details', 'approved']].map(([l, k], i) => { const at = ['start', 'review', 'approved'].indexOf(ph); return `<li class="${i < at ? 'done' : ''} ${i === at ? 'on' : ''}"><span>${i < at ? '✓' : i + 1}</span>${l}</li>`; }).join('')}</ol>`;
 
+const KIND = {logo: '◆', image: '▣', footage: '▶', icon: '★', screenshot: '▤', voiceover: '♪', music: '♫'};
+const plan = (b) => {
+  const need = Array.isArray(b.assetsNeeded) ? b.assetsNeeded : [];
+  if (!String(b.storyline ?? '').trim() && !String(b.visuals ?? '').trim() && !need.length) return '';
+  return `<div class="plan"><div class="spread"><b>The plan behind the script</b><span class="small muted">Edit any part. The video is built from all three.</span></div>
+    <div class="g2">${ta('storyline', 'Storyline · scene by scene', b.storyline, 9)}${ta('visuals', 'Visuals and graphics · what the viewer sees', b.visuals, 9)}</div>
+    ${need.length ? `<div class="need"><div class="spread"><b>Please upload these</b><button type="button" class="btn sm" data-bf="go" data-key="media">Go to Media →</button></div>
+      <ul>${need.map((a) => `<li><span class="kind">${KIND[a.kind] ?? '●'} ${esc(a.kind || 'file')}</span><b>${esc(a.name)}</b>${a.why ? `<small class="dim">${esc(a.why)}</small>` : ''}</li>`).join('')}</ul>
+      <div class="small muted">Anything you skip, the studio makes as a glossy 3D icon or illustration.</div></div>` : ''}</div>`;
+};
+
 const body = (b, ph, m) => {
   if (ph === 'review') {
     const imp = !!b.scriptOriginal;
     return `<div class="note">Draft ready. Read it, edit it right here, or ask for changes and regenerate.</div>
       ${ta('script', `Script ${pill(imp ? 'improved by AI' : 'written by AI', 'violet')}`, b.script, 12)}
       <div class="small muted" data-count>${count(b.script)}</div>
+      ${plan(b)}
       <label class="f"><span>What should change? <i class="dim">(optional)</i></span><input class="in" data-instr placeholder="e.g. shorter, more energetic, mention the free trial" /></label>
       <div class="row"><button type="button" class="btn ghost" data-st="back" ${dis()}>← Back</button><button type="button" class="btn" data-st="regen" ${dis()}>↻ Regenerate</button>${imp ? `<button type="button" class="btn ghost" data-st="revert" ${dis()}>Use my original</button>` : ''}
         <button type="button" class="btn main" data-st="approve" ${dis()}>Approve script and fill details →</button></div>`;
@@ -41,6 +53,7 @@ const body = (b, ph, m) => {
     const also = {title: 'title', style: 'style words', captions: 'captions', durationSec: 'length', notes: 'notes'};
     return `<div class="approved"><span class="okdot">✓</span><div style="flex:1"><b>Script approved</b><div class="small muted" data-count>${count(b.script)}</div></div><button type="button" class="btn sm" data-st="edit" ${dis()}>Edit script</button></div>
       <details class="fold"><summary>Show the script</summary>${ta('script', '', b.script, 8)}</details>
+      ${plan(b) ? `<details class="fold" open><summary>Storyline, visuals and files to upload</summary>${plan(b)}</details>` : ''}
       <div class="spread"><div><b>Video details</b><div class="small muted">${ST.filled.length ? 'Filled in by the AI from your script. Change anything you like.' : 'Edit anything that is not right.'}</div></div><button type="button" class="btn sm" data-st="refill" ${dis()}>↻ Refill all from script</button></div>
       <div class="g2">${filled('audience', inp('audience', 'Audience', b.audience, 'e.g. Indian digital agencies'))}${filled('cta', inp('cta', 'Call to action', b.cta, 'e.g. Start your free trial'))}</div>
       ${filled('idea', ta('idea', 'Idea / goal', b.idea, 2, 'What the video is for'))}
@@ -48,6 +61,8 @@ const body = (b, ph, m) => {
       ${filled('onScreen', ta('onScreen', 'Key on-screen text', b.onScreen, 4, 'Headlines, prices, numbers that must appear exactly.'))}
       ${Object.keys(also).some((k) => ST.filled.includes(k)) ? `<div class="row small muted">${pill('✦ also filled', 'violet')}${Object.keys(also).filter((k) => ST.filled.includes(k)).map((k) => pill(also[k])).join('')}<span>in the sections below</span></div>` : ''}`;
   }
+  if (m === 'story') return `${ta('story', 'Your story', b.story, 12, 'Paste the whole story or rough notes here, in any order. The AI separates it into the exact script, the storyline, and the visuals and graphics.')}<small class="dim">Mention anything you already know: scenes you picture, icons, screenshots, what must not appear.</small><div class="small muted" data-count="story">${count(b.story)}</div>
+       <div class="row"><button type="button" class="btn main" data-st="split" ${dis()}>Split into script, storyline and visuals</button><span class="small muted">You get three editable parts plus a list of images and footage to upload. Nothing else is filled in until you approve.</span></div>`;
   return m === 'script'
     ? `${ta('script', 'Your script', b.script, 10, 'Paste your script here. One sentence per line works best.')}<div class="small muted" data-count>${count(b.script)}</div>
        <div class="row"><button type="button" class="btn main" data-st="improve" ${dis()}>Improve with AI</button><button type="button" class="btn" data-st="use" ${dis()}>Use as it is →</button><span class="small muted">Improve rewrites it for you to review. “Use as it is” keeps your words and fills in the rest.</span></div>`
@@ -78,7 +93,7 @@ const usage = () => {
 export const storyHTML = () => {
   const b = brief(), ph = phase(b), m = mode(b);
   if (ST.pid !== S.cur.project.id) Object.assign(ST, {pid: S.cur.project.id, usage: null, filled: [], error: '', score: null, hooks: null});
-  const modeBar = ph === 'start' ? `<div class="seg" role="tablist"><button type="button" role="tab" class="${m === 'idea' ? 'on' : ''}" data-st="mode" data-mode="idea" ${dis()}><b>I have an idea</b><small>AI writes the script</small></button><button type="button" role="tab" class="${m === 'script' ? 'on' : ''}" data-st="mode" data-mode="script" ${dis()}><b>I have a script</b><small>Improve it or use it as it is</small></button></div>` : steps(ph);
+  const modeBar = ph === 'start' ? `<div class="seg three" role="tablist"><button type="button" role="tab" class="${m === 'story' ? 'on' : ''}" data-st="mode" data-mode="story" ${dis()}><b>I have a story</b><small>Split into script, storyline, visuals</small></button><button type="button" role="tab" class="${m === 'idea' ? 'on' : ''}" data-st="mode" data-mode="idea" ${dis()}><b>I have an idea</b><small>AI writes the script</small></button><button type="button" role="tab" class="${m === 'script' ? 'on' : ''}" data-st="mode" data-mode="script" ${dis()}><b>I have a script</b><small>Improve it or use it as it is</small></button></div>` : steps(ph);
   return `<div class="spread"><div><h2>Story</h2><div class="small muted">Start from an idea or a script</div></div>
     <div class="row" style="gap:8px"><button type="button" class="btn sm" data-vl="pick-script" ${dis()}>From library</button>${words(b.script) ? `<button type="button" class="btn sm" data-vl="save-script" ${dis()} title="Keep this script to reuse in other videos">Save to library</button>` : ''}</div></div>${modeBar}${body(b, ph, m)}${checks(b)}
     ${ST.busy ? `<div class="run"><div class="row"><i class="live"></i><b>${RUN[ST.action] ?? 'Working…'}</b><span class="small muted" data-st-time></span><button type="button" class="btn sm ghost" data-st="cancel">Stop</button></div><div class="bar"><span class="sheen"></span></div></div>` : ''}
@@ -118,10 +133,11 @@ document.addEventListener('click', async (ev) => {
   const br = brief(), instr = () => String($('#sec-story [data-instr]')?.value ?? '').trim();
   switch (b.dataset.st) {
     case 'mode': set('storyMode', b.dataset.mode); paintStory(); break;
+    case 'split': if (!text('story')) { toast('Paste your story first.'); break; } set('story', text('story')); await run('split', {brief: {story: text('story')}}); break;
     case 'write': if (!text('idea')) { toast('Write your idea first.'); break; } await run('script', {brief: {idea: text('idea')}}); break;
     case 'improve': if (!text('script')) { toast('Paste your script first.'); break; } await run('improve', {brief: {script: text('script')}}); break;
     case 'use': if (!text('script')) { toast('Paste your script first.'); break; } set('script', text('script')); set('scriptOriginal', ''); await run('fill', {brief: {script: text('script')}}); break;
-    case 'regen': { const i = instr(); if (br.scriptOriginal) await run('improve', {instruction: i, brief: {script: br.scriptOriginal}}); else await run('script', {instruction: i, brief: {script: text('script'), idea: text('idea') || br.idea}}); break; }
+    case 'regen': { const i = instr(); if (br.story && !br.scriptOriginal) { await run('split', {instruction: i, brief: {story: br.story, script: text('script')}}); break; } if (br.scriptOriginal) await run('improve', {instruction: i, brief: {script: br.scriptOriginal}}); else await run('script', {instruction: i, brief: {script: text('script'), idea: text('idea') || br.idea}}); break; }
     case 'revert': set('script', br.scriptOriginal); set('scriptOriginal', ''); set('scriptState', 'review'); paintStory(); break;
     case 'approve': set('script', text('script')); await run('fill', {brief: {script: text('script')}}); break;
     case 'refill': await run('fill', {overwrite: true, brief: {script: text('script')}}); break;
@@ -145,5 +161,6 @@ document.addEventListener('click', async (ev) => {
 });
 document.addEventListener('input', (ev) => {
   const t = ev.target;
-  if (t.dataset?.b === 'script' && t.closest('#sec-story')) { const c = $('#sec-story [data-count]'); if (c) c.textContent = count(t.value); }
+  if (t.dataset?.b === 'script' && t.closest('#sec-story')) { const c = $('#sec-story [data-count]:not([data-count="story"])'); if (c) c.textContent = count(t.value); }
+  if (t.dataset?.b === 'story' && t.closest('#sec-story')) { const c = $('#sec-story [data-count="story"]'); if (c) c.textContent = count(t.value); }
 });

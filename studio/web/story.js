@@ -20,10 +20,10 @@ const countText = (t) => { const n = words(t); return n ? `${n} words · about $
 const brief = () => C.S.cur.project.brief;
 // Videos made before this assistant existed (no scriptState, already past the brief) count as approved.
 const phase = (b) => !String(b.script ?? '').trim() ? 'start' : b.scriptState === 'approved' || (b.scriptState === undefined && C.S.cur.project.status !== 'brief') ? 'approved' : b.scriptState === 'review' ? 'review' : 'start';
-const mode = (b) => b.storyMode ?? (String(b.script ?? '').trim() && !String(b.idea ?? '').trim() ? 'script' : 'idea');
+const mode = (b) => b.storyMode ?? (String(b.story ?? '').trim() ? 'story' : String(b.script ?? '').trim() && !String(b.idea ?? '').trim() ? 'script' : 'idea');
 
-const RUN_TEXT = {script: 'Writing your script…', improve: 'Improving your script…', fill: 'Reading the script and filling in the details…', score: 'Scoring your script…', hooks: 'Looking for stronger hooks…'};
-const TYPICAL = {script: '10 to 30 s', improve: '10 to 30 s', fill: '5 to 15 s', score: '5 to 15 s', hooks: '5 to 15 s'};
+const RUN_TEXT = {split: 'Splitting your story into script, storyline and visuals…', script: 'Writing your script…', improve: 'Improving your script…', fill: 'Reading the script and filling in the details…', score: 'Scoring your script…', hooks: 'Looking for stronger hooks…'};
+const TYPICAL = {split: '15 to 40 s', script: '10 to 30 s', improve: '10 to 30 s', fill: '5 to 15 s', score: '5 to 15 s', hooks: '5 to 15 s'};
 
 // Score / hooks: read-only checks under the script. Results stay until the project changes; a note says when the script has moved on.
 const band = (n, hi) => { const p = n / hi * 100; return p >= 80 ? 'good' : p >= 60 ? 'ok' : 'low'; };
@@ -63,6 +63,27 @@ const startIdea = (b) => `
   <div class="st-actions"><button type="button" class="btn primary lg" data-story="write" ${dis()}>✦ Write the script</button>
     <span class="small muted">The AI writes a voiceover script from your idea. You review it before anything else is filled in.</span></div>`;
 
+const startStory = (b) => `
+  ${C.field('story', 'Your story', b.story, {rows: 12, placeholder: 'Paste the whole story or rough notes here, in any order. The AI separates it into the exact script, the storyline, and the visuals and graphics.', hint: 'Mention anything you already know: scenes you picture, icons, screenshots, what must not appear.'})}
+  <div class="small muted st-count" data-story-count="story">${countText(b.story)}</div>
+  <div class="st-actions"><button type="button" class="btn primary lg" data-story="split" ${dis()}>✦ Split into script, storyline &amp; visuals</button>
+    <span class="small muted">You get three editable parts, plus a list of the images and footage you should upload. Nothing else is filled in until you approve.</span></div>`;
+
+const KIND_ICON = {logo: '◆', image: '▣', footage: '▶', icon: '★', screenshot: '▤', voiceover: '♪', music: '♫'};
+const planHTML = (b) => {
+  const need = Array.isArray(b.assetsNeeded) ? b.assetsNeeded : [];
+  if (!String(b.storyline ?? '').trim() && !String(b.visuals ?? '').trim() && !need.length) return '';
+  return `<div class="st-plan"><div class="st-plan-head"><b>The plan behind the script</b><span class="small muted">Edit any part. The video is built from all three.</span></div>
+    <div class="grid g2">
+      ${C.field('storyline', 'Storyline · scene by scene', b.storyline, {rows: 9})}
+      ${C.field('visuals', 'Visuals &amp; graphics · what the viewer sees', b.visuals, {rows: 9})}
+    </div>
+    ${need.length ? `<div class="st-need"><div class="spread"><b>Please upload these</b><button type="button" class="btn sm" data-action="bsec-go" data-key="media">Go to Media &amp; references →</button></div>
+      <ul>${need.map((a) => `<li><span class="kind">${KIND_ICON[a.kind] ?? '●'} ${esc(a.kind || 'file')}</span><b>${esc(a.name)}</b>${a.why ? `<small>${esc(a.why)}</small>` : ''}</li>`).join('')}</ul>
+      <div class="small muted">Anything you skip, the studio makes as a glossy 3D icon or illustration.</div></div>` : ''}
+  </div>`;
+};
+
 const startScript = (b) => `
   ${C.field('script', 'Your script', b.script, {rows: 10, placeholder: 'Paste your script here. One sentence per line works best.'})}
   <div class="small muted st-count" data-story-count>${countText(b.script)}</div>
@@ -76,6 +97,7 @@ const review = (b) => {
   <div class="st-note"><b>Draft ready.</b> Read it, edit it right here, or ask for changes and regenerate.</div>
   <div class="st-f">${C.field('script', `Script <span class="pill ai">${improved ? 'improved by AI' : 'written by AI'}</span>`, b.script, {rows: 12})}</div>
   <div class="small muted st-count" data-story-count>${countText(b.script)}</div>
+  ${planHTML(b)}
   <label class="f"><span>What should change? <i class="muted">(optional)</i></span><input data-story-instr placeholder="e.g. shorter, more energetic, mention the free trial" /></label>
   <div class="st-actions"><button type="button" class="btn ghost" data-story="back" ${dis()}>← Back</button>
     <button type="button" class="btn" data-story="regen" ${dis()} title="${improved ? 'Improve your original text again' : 'Write a new version from your idea'}">↻ Regenerate</button>
@@ -90,6 +112,7 @@ const approved = (b) => {
   <div class="st-approved"><span class="st-check">✓</span><div><b>Script approved</b><div class="small muted">${countText(b.script)}</div></div>
     <button type="button" class="btn ghost sm" data-story="edit" ${dis()}>Edit script</button></div>
   <details class="st-script"><summary>Show the script</summary>${C.field('script', '', b.script, {rows: 8})}</details>
+  ${planHTML(b) ? `<details class="st-script" open><summary>Storyline, visuals &amp; files to upload</summary>${planHTML(b)}</details>` : ''}
   <div class="st-fill-head"><div><b>Video details</b><div class="small muted">${ST.filled.length ? 'Filled in by the AI from your script. Change anything you like.' : 'Edit anything that is not right.'}</div></div>
     <button type="button" class="btn sm" data-story="refill" ${dis()} title="Let the AI fill every box again from the script">↻ Refill all from script</button></div>
   <div class="st-rows">
@@ -107,10 +130,10 @@ const approved = (b) => {
 export const storyHTML = () => {
   const b = brief(), ph = phase(b), m = mode(b), tag = C.aiTag?.();
   if (ST.pid !== C.S.cur.project.id) { ST.pid = C.S.cur.project.id; ST.usage = null; ST.filled = []; ST.error = ''; ST.score = ST.hooks = null; }
-  const body = ph === 'review' ? review(b) : ph === 'approved' ? approved(b) : m === 'script' ? startScript(b) : startIdea(b);
+  const body = ph === 'review' ? review(b) : ph === 'approved' ? approved(b) : m === 'story' ? startStory(b) : m === 'script' ? startScript(b) : startIdea(b);
   return `
     <div class="st-top">
-      ${ph === 'start' ? `<div class="st-mode" role="tablist"><button type="button" role="tab" class="${m === 'idea' ? 'on' : ''}" data-story="mode" data-mode="idea" ${dis()}><b>I have an idea</b><small>AI writes the script</small></button><button type="button" role="tab" class="${m === 'script' ? 'on' : ''}" data-story="mode" data-mode="script" ${dis()}><b>I have a script</b><small>Improve it or use it as it is</small></button></div>` : stepper(ph)}
+      ${ph === 'start' ? `<div class="st-mode" role="tablist"><button type="button" role="tab" class="${m === 'story' ? 'on' : ''}" data-story="mode" data-mode="story" ${dis()}><b>I have a story</b><small>Split into script, storyline, visuals</small></button><button type="button" role="tab" class="${m === 'idea' ? 'on' : ''}" data-story="mode" data-mode="idea" ${dis()}><b>I have an idea</b><small>AI writes the script</small></button><button type="button" role="tab" class="${m === 'script' ? 'on' : ''}" data-story="mode" data-mode="script" ${dis()}><b>I have a script</b><small>Improve it or use it as it is</small></button></div>` : stepper(ph)}
       ${tag ? `<span class="pill ai" title="The model that answers when you press an AI button here">✦ AI · ${esc(tag)}</span>` : ''}
     </div>
     ${body}
@@ -166,6 +189,9 @@ document.addEventListener('click', async (ev) => {
   const br = brief(), instr = () => String($('[data-story-instr]')?.value ?? '').trim();
   switch (b.dataset.story) {
     case 'mode': C.setBrief('storyMode', b.dataset.mode); renderStory(); break;
+    case 'split':
+      if (!text('story')) { C.toast('Paste your story first.'); break; }
+      C.setBrief('story', text('story')); await run('split', {brief: {story: text('story')}}); break;
     case 'write':
       if (!text('idea')) { C.toast('Write your idea first.'); break; }
       await run('script', {brief: {idea: text('idea')}}); break;
@@ -177,6 +203,7 @@ document.addEventListener('click', async (ev) => {
       C.setBrief('script', text('script')); C.setBrief('scriptOriginal', ''); await run('fill', {brief: {script: text('script')}}); break;
     case 'regen': {
       const i = instr();
+      if (br.story && !br.scriptOriginal) { await run('split', {instruction: i, brief: {story: br.story, script: text('script')}}); break; }
       if (br.scriptOriginal) await run('improve', {instruction: i, brief: {script: br.scriptOriginal}});
       else await run('script', {instruction: i, brief: {script: text('script'), idea: text('idea') || br.idea}});
       break;
@@ -210,5 +237,6 @@ document.addEventListener('click', async (ev) => {
 
 document.addEventListener('input', (ev) => {
   const t = ev.target;
-  if (t.name === 'script' && t.closest('#story-card')) { const c = $('[data-story-count]'); if (c) c.textContent = countText(t.value); }
+  if (t.name === 'script' && t.closest('#story-card')) { const c = $('[data-story-count]:not([data-story-count="story"])'); if (c) c.textContent = countText(t.value); }
+  if (t.name === 'story' && t.closest('#story-card')) { const c = $('[data-story-count="story"]'); if (c) c.textContent = countText(t.value); }
 });

@@ -99,6 +99,8 @@ label.f.ai-filled > span::after, .f.ai-filled > .fl::after { font-weight: 500; }
 .tasks li.next small { font-weight: 500; }
 .tasks-ai summary { font-weight: 500; }
 .tasks-ai li.in_progress { font-weight: 500; }
+.st-need .kind { font-weight: 600; }
+.rl i { font-weight: 600; }
 .tabs .ai-badge { font-weight: 600; }
 .st-big { font-weight: 600; }
 .st-big small { font-weight: 500; }

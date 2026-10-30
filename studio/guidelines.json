@@ -1,0 +1,63 @@
+{
+  "general": {
+    "title": "Always follow",
+    "do": [
+      "Hook in the first 2 seconds: the first frame already shows the idea, never a logo-only opening on a short reel.",
+      "One idea per scene, one headline per scene, at most two short lines of text.",
+      "Every scene has one clear focal point; everything else supports it.",
+      "Use real MagicBolt assets and glossy 3D icons; keep the same icon style through the whole video.",
+      "Vary rhythm: quick beats, then a held beat before the big reveal.",
+      "End with a clear call to action and the logo, held long enough to read (at least 2 seconds).",
+      "Keep text on screen long enough to read it twice (about 0.35 s per word, minimum 1.2 s)."
+    ],
+    "dont": [
+      "Do not use flat emoji, clip-art, or stock-photo look.",
+      "Do not put more than 12 words on screen at once.",
+      "Do not use the same transition or text animation twice in a row.",
+      "Do not show real account data, keys, passwords or DNS values; use demo data.",
+      "Do not invent prices, numbers or features that are not in the script.",
+      "Do not let background motion compete with the content."
+    ]
+  },
+  "formats": {
+    "vertical": {
+      "title": "Vertical (Reels, Shorts, Stories, 9:16)",
+      "do": [
+        "Keep key text inside the safe area: clear of the top ~250 px and the bottom ~350 px (app buttons and captions sit there).",
+        "Stack elements vertically; one big subject, large type (headline at least 80 px at 1080 wide).",
+        "Faster pacing: a visual change about every 1.5 to 3 seconds.",
+        "Burned-in captions: most people watch muted."
+      ],
+      "dont": [
+        "Do not use small side-by-side layouts; they become unreadable on a phone.",
+        "Do not place the CTA or logo in the bottom 350 px."
+      ]
+    },
+    "horizontal": {
+      "title": "Horizontal (YouTube, website, presentations, 16:9)",
+      "do": [
+        "Use the full width: text on one side, visual on the other.",
+        "Slightly slower pacing is fine; a visual change about every 3 to 5 seconds.",
+        "Keep text inside a 5% margin on all sides (TV and player overscan).",
+        "A title card is fine here; tutorials can open with logo and title."
+      ],
+      "dont": [
+        "Do not make type too large; it looks shouty on a wide frame.",
+        "Do not leave big empty areas on the left or right."
+      ]
+    },
+    "square": {
+      "title": "Square and 4:5 (feed posts, loops, 1:1)",
+      "do": [
+        "Centre the subject; keep text inside a 7% margin.",
+        "Design as a loop when it is short: the last frame should flow into the first.",
+        "Medium pacing, big simple shapes: the feed shows it small."
+      ],
+      "dont": [
+        "Do not rely on audio; feed videos autoplay muted.",
+        "Do not use thin lines or tiny type."
+      ]
+    }
+  },
+  "extra": {"do": [], "dont": []}
+}

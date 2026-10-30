@@ -86,3 +86,37 @@
 .tg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; } .tg .gn { width: 64px; flex: none; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
 .chipb { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 99px; border: 1px solid var(--line2); background: var(--fill); color: var(--soft); cursor: pointer; transition: background .2s, border-color .2s; }
 .chipb::before { content: "["; opacity: .45; } .chipb::after { content: "]"; opacity: .45; } .chipb:hover { background: rgba(139,124,255,.2); border-color: var(--lav); color: #fff; }
+
+/* collapsible sections: click a section's title to open or close it */
+.fsec { position: relative; }
+.fsec > :first-child { cursor: pointer; border-radius: 14px; }
+.fsec > :first-child h2::after { content: "BE"; display: inline-block; margin-left: 10px; font-size: 14px; color: var(--dim); transition: transform .2s; }
+.fsec:not(.open) > :first-child h2::after { transform: rotate(-90deg); }
+.fsec > :first-child:hover h2 { color: #fff; }
+.fsec:not(.open) { padding-top: 18px; padding-bottom: 18px; gap: 0; }
+.fsec:not(.open) > :not(:first-child) { display: none; }
+.fsec:not(.open) > :first-child .btn, .fsec:not(.open) > :first-child .row.small { display: none; }
+.fsec:not(.open)[data-sum]::after { content: attr(data-sum); position: absolute; right: 22px; top: 50%; transform: translateY(-50%); max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--soft); background: var(--fill); border: 1px solid var(--line2); border-radius: 99px; padding: 3px 12px; pointer-events: none; }
+
+/* story: three entry modes, plan, files to upload */
+.seg.three { grid-template-columns: repeat(3, 1fr); max-width: 760px; }
+.plan { display: grid; gap: 14px; padding: 16px; border-radius: 18px; background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.plan textarea { min-height: 190px; font-size: 13px; line-height: 1.55; }
+.need { display: grid; gap: 8px; padding: 14px; border-radius: 16px; border: 1px dashed var(--line2); }
+.need ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.need li { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.need .kind { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #D6D0FF; background: rgba(139,124,255,.2); border-radius: 99px; padding: 2px 9px; }
+
+/* do's and don'ts */
+.rg-grid { display: grid; gap: 12px; }
+.rg { padding: 14px 16px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,.04); }
+.rg.off { opacity: .55; }
+.rg-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.rg .switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.rg .switch input { width: 18px; height: 18px; accent-color: #8B7CFF; }
+.rg .switch b { display: block; font-size: 14px; } .rg .switch small { display: block; color: var(--dim); font-size: 11.5px; }
+.rl { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 5px; }
+.rl li { display: flex; gap: 9px; font-size: 13px; line-height: 1.45; color: var(--soft); }
+.rl i { flex: none; width: 18px; height: 18px; border-radius: 50%; font-style: normal; font-size: 10px; font-weight: 700; display: grid; place-items: center; margin-top: 1px; }
+.rl .do i { background: rgba(94,242,166,.18); color: #5EF2A6; } .rl .dont i { background: rgba(255,122,134,.18); color: #FF7A86; }
+.re-set { display: grid; gap: 8px; } .re-set textarea { font-size: 12.5px; }

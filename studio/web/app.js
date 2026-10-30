@@ -6,6 +6,7 @@ import {initDecks, renderDecks} from './decks.js';
 import {initReview, reviewHtml, reviewEditing} from './review.js';
 import {initFiles} from './files.js';
 import {initStory, storyHTML, renderStory, storyRunning, stopStoryRun, aiFilled, usageHTML} from './story.js';
+import {initRules, rulesHTML, renderRules, rulesSummary} from './rules.js';
 import {initVoice, renderVoice, stripTags} from './voice.js';
 import {initActivity, onServerEvent, note, setConnection, refreshContext} from './activity.js';
 const $ = (s, el = document) => el.querySelector(s);
@@ -344,6 +345,7 @@ const field = (name, label, value, {type = 'text', rows, placeholder = '', hint 
 const select = (name, label, value, opts) => `<label class="f"><span>${label}</span><select name="${name}">${opts.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o || '(preset default)']; return `<option value="${esc(v)}" ${String(v) === String(value ?? '') ? 'selected' : ''}>${esc(l)}</option>`; }).join('')}</select></label>`;
 
 initStory({S, api: (...a) => api(...a), toast: (...a) => toast(...a), field, select, LANGS, flushSave: () => flushSave(), setBrief: (...a) => setBrief(...a), aiTag, onBusy: () => syncHeadStop(), onChange: () => updateRail(), onFilled: () => renderProject()});
+initRules({S, api: (...a) => api(...a), toast: (...a) => toast(...a), field, setBrief: (...a) => setBrief(...a), onChange: () => updateRail()});
 initVoice({S, api: (...a) => api(...a), toast: (...a) => toast(...a), flushSave: () => flushSave()});
 const OUT_FORMATS = [['mp4', 'MP4', 'video with sound'], ['gif', 'GIF', 'loops · no sound'], ['webp', 'WebP', 'animated · no sound']];
 const ANIM_SIZES = [[480, 'Small', '480 px'], [720, 'Medium', '720 px'], [1080, 'Large', '1080 px']];
@@ -355,8 +357,9 @@ const outputPicker = (b) => {
     ${anim ? `<div class="anim-opts">${optField('Animation size', optGroup('data-animw', Number(b.animWidth) || 480, ANIM_SIZES))}${optField('Animation frame rate', optGroup('data-animfps', Number(b.animFps) || 15, ANIM_FPS_OPTS))}
       ${secs > 20 ? `<div class="st-note" style="grid-column:1/-1">This is about ${secs} seconds long. ${f.toUpperCase()}s that long make very large files. Under 15 seconds works best, or use MP4.</div>` : ''}</div>` : ''}`;
 };
-const BSECS = [['basics', 1, 'Basics'], ['story', 2, 'Story'], ['format', 3, 'Format'], ['look', 4, 'Look'], ['motion', 5, 'Motion'], ['media', 6, 'Media']];
-const bsecFolded = (k) => { try { return localStorage.getItem(`studio-bsec-${k}`) === '1'; } catch { return false; } };
+const BSECS = [['basics', 1, 'Basics'], ['story', 2, 'Story'], ['format', 3, 'Format'], ['look', 4, 'Look'], ['motion', 5, 'Motion'], ['media', 6, 'Media'], ['rules', 7, "Do's & don'ts"]];
+// Every section starts closed; the one you open stays open on this PC.
+const bsecFolded = (k) => { try { return localStorage.getItem(`studio-bsec-${k}`) !== '0'; } catch { return true; } };
 const bsec = (key, n, title, sub, summary, body) => `
   <section class="bsec ${bsecFolded(key) ? 'folded' : ''}" data-bsec="${key}" id="bsec-${key}">
     <button type="button" class="bsec-head" data-action="bsec-fold" aria-expanded="${!bsecFolded(key)}"><span class="n">${n}</span><span class="bt"><b>${title}</b><small>${sub}</small></span><span class="bsum">${summary}</span><i class="sec-chev" aria-hidden="true">▾</i></button>
@@ -483,6 +486,8 @@ const renderBrief = () => {
         ${field('links', 'Links (one per line)', b.links, {rows: 4, placeholder: 'Websites, product pages, YouTube/Instagram references…'})}
         ${field('notes', 'Notes · do & don\'t', b.notes, {rows: 4, placeholder: 'e.g. No stock photos. Keep the logo big at the end. Prices in INR.'})}
       </div>`)}
+
+      ${bsec('rules', 7, "Do's & don'ts", 'standing rules, per format', rulesSummary(b), rulesHTML())}
       </div>
       <aside class="brief-rail" id="brief-rail" aria-label="Brief summary"></aside>
       </div>
@@ -494,6 +499,7 @@ const renderBrief = () => {
     </form>`;
   $('#story-card').innerHTML = storyHTML();
   renderVoice();
+  renderRules();
   updateRail();
   renderAssets();
 };

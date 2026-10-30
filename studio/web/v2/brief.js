@@ -2,6 +2,7 @@
 import {$, S, api, esc, toast, fmtT, pill, ICON, queueSave, flushSave, words, classicUrl} from './core.js';
 import {initStory, storyHTML, storyRunning} from './story.js';
 import {paintVoice} from './voice.js';
+import {initRules, rulesHTML, rulesSummary} from './rules.js';
 
 const SIZES = [['Reel 9:16', 1080, 1920], ['Landscape 16:9', 1920, 1080], ['Square 1:1', 1080, 1080], ['Portrait 4:5', 1080, 1350], ['Loop 1200²', 1200, 1200], ['4K 16:9', 3840, 2160]];
 const CAPTIONS = [['', 'Preset default'], ['word-by-word pill', 'Word by word'], ['step pill', 'Step pill'], ['kinetic big lines', 'Big lines'], ['subtitles', 'Subtitles'], ['none', 'None']];
@@ -20,6 +21,21 @@ const setB = (k, v) => { brief()[k] = v; queueSave({brief: {[k]: v}}, setState);
 const outFmt = (b) => (OUTS.some((o) => o[0] === b.outputFormat) ? b.outputFormat : 'mp4');
 const moodList = (t) => String(t ?? '').split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
 const jobText = {};
+
+// ---------- folding: every section starts closed, the ones you open stay open on this PC ----------
+const FOLD = (k) => `studio-v2-sec-${k}`;
+const isOpen = (k) => { try { return localStorage.getItem(FOLD(k)) === '1'; } catch { return false; } };
+const setOpen = (k, on) => { $(`#sec-${k}`)?.classList.toggle('open', on); try { localStorage.setItem(FOLD(k), on ? '1' : '0'); } catch { /* ignore */ } };
+const SUMS = {
+  basics: () => proj().title,
+  story: () => { const b = brief(), n = words(b.script); return !n ? 'not started' : b.scriptState === 'review' ? `in review · ${n} words` : `${n} words`; },
+  voice: () => (proj().assets.some((x) => x.role === 'voiceover') ? 'voiceover added' : 'optional'),
+  format: () => { const b = brief(); return `${b.width}×${b.height} · ${b.fps} fps · ${outFmt(b).toUpperCase()}`; },
+  look: () => `${(brief().colors ?? []).length} colours`,
+  media: () => `${proj().assets.length} file${proj().assets.length === 1 ? '' : 's'}`,
+  rules: () => rulesSummary(),
+};
+const paintSums = () => { for (const [k, fn] of Object.entries(SUMS)) { const el = $(`#sec-${k}`); if (el) el.dataset.sum = fn(); } };
 
 // ---------- readiness (the same checks as the classic page) ----------
 const readiness = () => {
@@ -65,6 +81,7 @@ const SECTIONS = {
       <div class="opts">${MOODS.map((m) => `<button type="button" class="opt slim ${moods.includes(m.toLowerCase()) ? 'on' : ''}" data-mood="${esc(m)}">${esc(m)}</button>`).join('')}</div>
       ${field('Captions', opts('data-caption', b.captions ?? '', CAPTIONS))}`;
   },
+  rules: () => rulesHTML(),
   media: () => `${head('Media and references', 'Voiceover, music, logo, images, footage, reference videos')}
     <div class="drop" id="b-drop" tabindex="0" role="button" aria-label="Upload files"><b>Drop files here</b> or click to upload<div class="small muted">Voiceovers are transcribed for timing · reference videos are turned into frames the AI can study</div></div><input type="file" id="b-file" multiple hidden />
     <label class="f" style="max-width:460px"><span>Transcription speed <i class="dim">(for voiceovers you upload)</i></span><select class="in" data-tm>${[['auto', 'Auto: fast for English, accurate for Hindi and others'], ['fast', 'Fast: quickest for everything (weaker on Hindi)'], ['accurate', 'Accurate: always the careful model (slowest)']].map(([v, l]) => `<option value="${v}" ${v === (S.state.settings?.transcribeMode ?? 'auto') ? 'selected' : ''}>${l}</option>`).join('')}</select><small class="dim">This is the step that took about 16 minutes. A voiceover made with ElevenLabs here skips it.</small></label>
@@ -102,6 +119,7 @@ const paintRail = () => {
   el.innerHTML = `<div class="card tight"><div class="spread"><h3>Readiness</h3><span class="small muted">${done} of ${req.length}</span></div><div class="bar" style="margin:10px 0"><i style="width:${Math.max(4, pct)}%"></i></div>
       <ul class="rlist2">${items.map(([l, ok, key, tag]) => `<li><button type="button" class="${ok ? 'ok' : ''}" data-bf="go" data-key="${key}"><span class="tick">${ok ? '✓' : ''}</span><span>${l}</span>${tag ? `<small>${tag}</small>` : ''}</button></li>`).join('')}</ul></div>
     <div class="card tight"><h3 style="margin-bottom:6px">At a glance</h3>${st('Spoken length', n ? `≈ ${fmtT(n / 2.5)}` : '–')}${st('Words', n || '–')}${st('Format', `${size ? `${size[0].split(' ')[0]} · ` : ''}${b.width}×${b.height}`)}${st('Frame rate', `${b.fps} fps`)}${st('Target length', b.durationSec ? `${b.durationSec} s` : 'auto')}${st('Output', outFmt(b).toUpperCase())}${st('Brand', esc(brand?.name ?? 'Custom'))}${st('Files', p.assets.length)}</div>`;
+  paintSums();
   const act = $('#b-actions');
   if (act) {
     const busy = S.cur.busy;
@@ -117,11 +135,13 @@ export const render = async (host, c) => {
   const p = c.project;
   host.innerHTML = `<div class="bgrid"><div class="stack" id="b-main">
       <section class="card" id="sec-basics"></section><section class="card stack" id="sec-story"></section><section class="card stack" id="sec-voice"></section>
-      <section class="card stack" id="sec-format"></section><section class="card stack" id="sec-look"></section><section class="card stack" id="sec-media"></section></div>
+      <section class="card stack" id="sec-format"></section><section class="card stack" id="sec-look"></section><section class="card stack" id="sec-media"></section><section class="card stack" id="sec-rules"></section></div>
     <aside class="rail" id="b-rail" aria-label="Brief summary"></aside></div><div class="barfix" id="b-actions"></div>`;
   for (const k of Object.keys(SECTIONS)) paint(k);
+  document.querySelectorAll('#b-main > section').forEach((el) => { el.classList.add('fsec'); el.classList.toggle('open', isOpen(el.id.slice(4))); });
   $('#sec-story').innerHTML = storyHTML();
   paintVoice(); paintRail();
+  initRules(paintRail);
   initStory((refill) => { paintRail(); if (refill) for (const k of ['basics', 'format', 'look']) paint(k); paintVoice(); });
   void p;
 };
@@ -161,6 +181,8 @@ document.addEventListener('drop', (ev) => { if (ev.target.closest?.('#b-drop')) 
 document.addEventListener('click', async (ev) => {
   if (!S.cur || !$('#b-main')) return;
   const t = ev.target;
+  const hd = t.closest('#b-main .fsec > :first-child');
+  if (hd && !t.closest('button, a, input, select, textarea, label, summary')) { const sec = hd.parentElement; setOpen(sec.id.slice(4), !sec.classList.contains('open')); return; }
   if (t.closest('#b-drop')) { $('#b-file').click(); return; }
   const d = t.closest('[data-size],[data-fps],[data-dur],[data-out],[data-animw],[data-animfps],[data-caption],[data-mood]');
   if (d) {
@@ -180,7 +202,7 @@ document.addEventListener('click', async (ev) => {
   const id = proj().id;
   try {
     switch (b.dataset.bf) {
-      case 'go': $(`#sec-${b.dataset.key}`)?.scrollIntoView({behavior: 'smooth', block: 'start'}); break;
+      case 'go': setOpen(b.dataset.key, true); $(`#sec-${b.dataset.key}`)?.scrollIntoView({behavior: 'smooth', block: 'start'}); break;
       case 'add-color': setB('colors', [...(brief().colors ?? []), '#1582D5']); paint('look'); break;
       case 'rm-color': setB('colors', brief().colors.filter((_, i) => i !== Number(b.dataset.i))); paint('look'); break;
       case 'brand-palette': { const br = S.state.brands.find((x) => x.id === brief().brandId); if (!br) return toast('Pick a brand kit first.'); setB('colors', Object.values(br.palette).slice(0, 6)); paint('look'); break; }

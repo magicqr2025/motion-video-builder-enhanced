@@ -418,6 +418,13 @@ html[data-theme="dark"] .tasks li.next { background: #3a2d13; color: #e6c26a; }
 html[data-theme="dark"] .tasks li.next small { color: #e0b770; }
 html[data-theme="dark"] .tasks-now { background: #292626; border: 1px solid #333030; color: #cecaca; }
 html[data-theme="dark"] .tasks-ai li.in_progress { color: #cecaca; }
+html[data-theme="dark"] .st-plan { background: #292727; border: 1px solid #333030; }
+html[data-theme="dark"] .st-need { background: #2b2828; border: 1px dashed #383535; }
+html[data-theme="dark"] .st-need .kind { color: #cecaca; background: #272525; }
+html[data-theme="dark"] .rg { border: 1px solid #343131; background: #2b2828; }
+html[data-theme="dark"] .rg.off { background: #282626; }
+html[data-theme="dark"] .rl .do i { background: #1c2c22; color: #75dcac; }
+html[data-theme="dark"] .rl .dont i { background: #341616; color: #e07771; }
 
 /* from ai-badge.css */
 html[data-theme="dark"] .tabs .ai-badge { color: #f6c65a; background: linear-gradient(135deg, #dbb734, #a0831e); }

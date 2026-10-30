@@ -8,6 +8,7 @@ import {startProcess, endProcess, addProcessTokens, activityLog} from './activit
 import {claudeEnv, runAgent} from './agent.mjs';
 import {LOOK_SPEC} from './look.mjs';
 import {stripAudioTags} from './voice.mjs';
+import {guidelinesText} from './guidelines.mjs';
 
 export const STORY_LANGS = ['English', 'Hinglish', 'Hindi', 'Hindi + English captions'];
 export const STORY_CAPTIONS = ['word-by-word pill', 'step pill', 'kinetic big lines', 'subtitles', 'none'];
@@ -32,6 +33,7 @@ const scriptRules = (b) => `Rules for the script:
 
 const PROMPTS = {
   script: (b) => `Write a voiceover script for a video.\n\n${ctxLines(b)}\n\n${scriptRules(b)}\n${b.instruction ? `\nThe previous draft was not right. Change this: ${b.instruction}\nPrevious draft:\n${b.script}\n` : ''}\nReply with only the script.`,
+  split: (b) => `A creator pasted a story or rough idea for a short video. Split it into the parts a video team needs. Use only what is in the story; never invent facts, prices or features.\n\n${ctxLines(b)}\n\nStory:\n${b.story}\n${b.instruction ? `\nThe previous result was not right. Change this: ${b.instruction}\nPrevious script:\n${b.script}\n` : ''}${guidelinesText(b) ?`\nHouse rules to respect while planning:\n${guidelinesText(b)}\n` : ''}\nReturn ONLY a JSON object:\n{"script": "the exact spoken voiceover, one sentence per line, hook first, call to action last; ${b.language || 'English'}${/hinglish/i.test(b.language || '') ? ' (Hindi words in English letters)' : ''}; about ${b.durationSec ? `${b.durationSec} seconds (~${Math.round(b.durationSec * WORDS_PER_SEC)} words)` : '45 to 60 seconds'}; no scene headings, no emojis",\n "storyline": "the story beat by beat, one line per scene: 'Scene 1 (0-5s) Hook: what happens and why'. 5 to 9 scenes, in order",\n "visuals": "one line per scene, matching the storyline: what the viewer SEES: the main visual, the graphics, glossy 3D icons or characters, text on screen, and the camera or motion idea",\n "assets": [{"name": "short item name, e.g. WhatsApp chat screenshot", "kind": "one of: logo | image | footage | icon | screenshot | voiceover | music", "why": "which scene needs it, in a few words"}]}\nList in "assets" only the things the creator should supply or confirm (their logo, product screenshots, footage, photos, brand icons). Skip anything that can be drawn as a glossy 3D icon. At most 10.`,
   improve: (b) => `Improve this voiceover script. Keep every fact and claim, keep its meaning and language${b.instruction ? '' : ', make it tighter, more natural when spoken, with a stronger hook and a clear ending'}.\n${b.instruction ? `Specific request: ${b.instruction}\n` : ''}\n${ctxLines({...b, idea: b.idea})}\n\n${scriptRules(b)}\n\nCurrent script:\n${b.script}\n\nReply with only the improved script.`,
   fill: (b) => `Read this approved voiceover script and fill in the whole video brief that goes with it.\n\n${ctxLines(b)}\n\nScript:\n${stripAudioTags(b.script)}\n\nReturn ONLY a JSON object with these keys:
 {"title": "a short video title, 2 to 6 words",
@@ -139,7 +141,7 @@ export const mountStory = (app, {wrap, need, changed, broadcast}) => {
 
   app.post('/api/projects/:id/story/assist', wrap(async (req, res) => {
     const p = need(req.params.id), action = req.body.action;
-    if (!['script', 'improve', 'fill', 'score', 'hooks'].includes(action)) throw Object.assign(new Error('Unknown story action.'), {status: 400});
+    if (!['script', 'improve', 'fill', 'score', 'hooks', 'split'].includes(action)) throw Object.assign(new Error('Unknown story action.'), {status: 400});
     if (action === 'score' || action === 'hooks') { // read-only checks: they never change the brief or the script
       const sb = {...p.brief, ...(req.body.brief ?? {})};
       if (!stripAudioTags(sb.script).trim()) throw Object.assign(new Error('There is no script yet.'), {status: 400});
@@ -152,14 +154,15 @@ export const mountStory = (app, {wrap, need, changed, broadcast}) => {
       return res.json({score: num(out.score, 100), verdict: str(out.verdict, 240), parts: (Array.isArray(out.parts) ? out.parts : []).map((x) => ({name: str(x.name, 30), score: num(x.score, 10), note: str(x.note, 240)})).filter((x) => x.name).slice(0, 8), fixes: (Array.isArray(out.fixes) ? out.fixes : []).map((f) => str(f, 240)).filter(Boolean).slice(0, 5), usage});
     }
     const b = {...p.brief, ...(req.body.brief ?? {}), instruction: String(req.body.instruction ?? '').trim()};
+    if (action === 'split' && !String(b.story ?? '').trim()) throw Object.assign(new Error('Paste your story first.'), {status: 400});
     if (action === 'script' && !String(b.idea ?? '').trim() && !(b.instruction && b.script)) throw Object.assign(new Error('Write your idea first.'), {status: 400});
     if ((action === 'improve' || action === 'fill') && !String(b.script ?? '').trim()) throw Object.assign(new Error('There is no script yet.'), {status: 400});
     // Regenerating an improvement starts again from the user's own text, not from the previous AI rewrite.
     if (action === 'improve' && p.brief.scriptState === 'review' && String(p.brief.scriptOriginal ?? '').trim()) b.script = p.brief.scriptOriginal;
     const original = action === 'improve' ? b.script : null;
-    const label = {script: 'Story · write script from idea', improve: 'Story · improve script', fill: 'Story · fill the whole brief from the script'}[action];
+    const label = {split: 'Story · split the story into script, storyline and visuals', script: 'Story · write script from idea', improve: 'Story · improve script', fill: 'Story · fill the whole brief from the script'}[action];
 
-    const {r, finish} = await aiCall(req, res, p, label, PROMPTS[action](b), {json: action === 'fill'});
+    const {r, finish} = await aiCall(req, res, p, label, PROMPTS[action](b), {json: action === 'fill' || action === 'split'});
     const {q, done} = finish(), brief = {...q.brief}, filled = [];
     if (action === 'fill') {
       const out = parseJson(r.text), redo = !!req.body.overwrite;
@@ -176,6 +179,13 @@ export const mountStory = (app, {wrap, need, changed, broadcast}) => {
       if (title && (redo || !String(q.title ?? '').trim() || /^untitled/i.test(q.title))) { q.title = title; filled.push('title'); }
       if (String(req.body.brief?.script ?? '').trim()) brief.script = String(req.body.brief.script).trim();
       brief.scriptState = 'approved'; brief.storyFilled = true;
+    } else if (action === 'split') {
+      const out = parseJson(r.text), str = (v, n) => String(Array.isArray(v) ? v.join('\n') : v ?? '').trim().slice(0, n);
+      const script = cleanScript(str(out.script, 8000));
+      if (!script) throw new Error('The AI returned an empty script. Try again.');
+      brief.story = str(b.story, 20000); brief.script = script; brief.storyline = str(out.storyline, 4000); brief.visuals = str(out.visuals, 6000);
+      brief.assetsNeeded = (Array.isArray(out.assets) ? out.assets : []).map((a) => ({name: str(a.name, 80), kind: str(a.kind, 20).toLowerCase(), why: str(a.why, 120)})).filter((a) => a.name).slice(0, 10);
+      brief.scriptState = 'review'; brief.storyMode = 'story'; delete brief.scriptOriginal;
     } else {
       const text = cleanScript(r.text);
       if (!text) throw new Error('The AI returned an empty script. Try again.');

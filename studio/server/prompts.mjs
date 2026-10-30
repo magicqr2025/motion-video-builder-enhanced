@@ -6,6 +6,7 @@ import {getPreset, getBrand, listPresets} from './projects.mjs';
 import {lookContext} from './look.mjs';
 import {inspirationContext, vocabulary} from './catalog.mjs';
 import {stripAudioTags} from './voice.mjs';
+import {guidelinesText} from './guidelines.mjs';
 
 const rel = (p) => path.relative(REEL, p).split(path.sep).join('/');
 
@@ -112,6 +113,7 @@ const fmtBrief = (p) => {
     ['Language', b.language], ['Script / voiceover text', stripAudioTags(b.script)], ['Key on-screen text', b.onScreen],
     ['Size', `${b.width}x${b.height} @ ${b.fps} fps`], ['Target duration', b.durationSec ? `${b.durationSec} s` : 'follow the voiceover / content'],
     ['Colours', (b.colors ?? []).join(', ')], ['Style words', b.style], ['Captions', b.captions], ['Links to study', b.links], ['Notes / do & don\'t', b.notes],
+    ['Storyline (scene by scene, keep this order)', b.storyline], ['Visual plan (scenes, graphics, icons)', b.visuals], ['Assets the user will provide', (b.assetsNeeded ?? []).map((x) => `${x.name} (${x.kind})`).join('; ')],
   ];
   return lines.filter(([, v]) => v && String(v).trim()).map(([k, v]) => `- **${k}:** ${String(v).trim().replace(/\n/g, '\n  ')}`).join('\n');
 };
@@ -143,6 +145,9 @@ ${fmtAssets(p)}
 
 ### Preset
 ${fmtPreset(p)}
+
+### Do's and don'ts (the user's standing rules: follow them)
+${guidelinesText(p.brief) || '- (none)'}
 
 ### Brand
 ${fmtBrand(p)}${p.look?.reviewed ? `\n\n${lookContext(p.look)}` : ''}${inspirationContext(p) ? `\n\n${inspirationContext(p)}` : ''}`;
