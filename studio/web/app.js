@@ -95,7 +95,7 @@ window.addEventListener('hashchange', () => load());
 const loadState = async () => {
   S.state = await api('/api/state');
   S.renderJob = S.state.renderJob;
-  $('#open-remotion').href = `http://localhost:${S.state.studioPort}`;
+  $('#open-remotion').href = `${S.state.previewUrl}`;
   renderSide();
   renderRenderPill();
 };
@@ -681,7 +681,7 @@ const renderText = () => {
   }
   const help = text._help ?? {};
   const groups = Object.entries(text).filter(([k]) => !k.startsWith('_'));
-  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const studioUrl = `${S.state.previewUrl}/${compositions.video}`;
   $('#tab').innerHTML = `
     <div class="text-layout">
       <form id="textform" class="stack" autocomplete="off">
@@ -773,7 +773,7 @@ const renderAudio = () => {
     S.audioLib = [];
     api('/api/audio-library').then((l) => { S.audioLib = l; if (S.tab === 'audio' && !S.audioDirty && S.cur?.audio) renderAudio(); }).catch(() => {});
   }
-  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const studioUrl = `${S.state.previewUrl}/${compositions.video}`;
   $('#tab').innerHTML = `
     ${S.voChanged === p.id ? `<div class="card spread" style="margin-bottom:16px;border:2px solid var(--gold)"><div><b>You changed the voiceover.</b><div class="muted small">The scenes were timed to the old one. Claude can re-time them to the new voiceover (the look stays the same).</div></div><button class="btn gold" data-action="resync-timing" ${busy ? 'disabled' : ''}>Re-sync timing with Claude</button></div>` : ''}
     <div class="text-layout">
@@ -858,7 +858,7 @@ const renderLook = () => {
   const onItems = items.filter((i) => (st.levels[i.key] ?? 0) > 0);
   const total = onItems.length;
   const ai = S.lookAI ?? {};
-  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const studioUrl = `${S.state.previewUrl}/${compositions.video}`;
   const hasStory = !!(String(p.brief.script ?? '').trim() || String(p.brief.idea ?? '').trim());
   $('#tab').innerHTML = `
     <div class="card look-intro">
@@ -922,7 +922,7 @@ const renderStyle = () => {
       <button class="btn primary lg" data-action="make-style-editable" ${busy ? 'disabled' : ''}>Make colours editable</button></div>`;
     return;
   }
-  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const studioUrl = `${S.state.previewUrl}/${compositions.video}`;
   const changed = Object.keys(style.colors).some((k) => style.colors[k] !== style._defaults?.[k]);
   $('#tab').innerHTML = `
     <div class="text-layout">
@@ -957,7 +957,7 @@ const bgControls = (b) => `<div class="card" id="bgctl"><div class="spread"><div
 const renderBackground = () => {
   const {project: p, busy, compositions} = S.cur;
   const f = S.bgForm ??= {objects: ['icons', 'sparkles'], custom: '', placement: 'behind', intensity: 'subtle', colors: '', scenes: ''};
-  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const studioUrl = `${S.state.previewUrl}/${compositions.video}`;
   $('#tab').innerHTML = `
     <div class="text-layout">
       <div class="stack">
@@ -1001,7 +1001,7 @@ const readBgForm = () => {
 const renderRender = () => {
   const {project: p, compositions, busy} = S.cur;
   const j = S.renderJob?.projectId === p.id ? S.renderJob : null;
-  const studioUrl = `http://localhost:${S.state.studioPort}/${compositions.video}`;
+  const studioUrl = `${S.state.previewUrl}/${compositions.video}`;
   const pct = Math.round((j?.progress ?? 0) * 100);
   const outDir = S.state.settings?.outDir ?? '';
   const fmt = outFmt(p.brief);

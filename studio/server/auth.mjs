@@ -70,7 +70,9 @@ const readToken = (token) => {
   try { const t = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')); return t.exp > Date.now() ? t : null; } catch { return null; }
 };
 const cookieOf = (req) => { const m = String(req.headers.cookie ?? '').match(new RegExp(`(?:^|; )${COOKIE}=([^;]+)`)); return m ? decodeURIComponent(m[1]) : ''; };
-const setCookie = (res, token, maxAgeMs) => res.append('Set-Cookie', `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeMs / 1000)}`);
+// On a server: COOKIE_DOMAIN=.example.com shares the sign-in with the preview hostname, COOKIE_SECURE=1 when served over https
+const cookieExtra = `${process.env.COOKIE_DOMAIN ? `; Domain=${process.env.COOKIE_DOMAIN}` : ''}${process.env.COOKIE_SECURE ? '; Secure' : ''}`;
+const setCookie = (res, token, maxAgeMs) => res.append('Set-Cookie', `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${Math.floor(maxAgeMs / 1000)}${cookieExtra}`);
 
 export const adminOf = (req) => {
   const t = readToken(cookieOf(req));

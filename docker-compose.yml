@@ -1,0 +1,36 @@
+# MotionStudio on a Linux server. No ports are published: a Cloudflare Tunnel is the only way in, so the server's IP is never exposed.
+# See deploy/DEPLOY.md.
+services:
+  studio:
+    build: ./deploy
+    image: motionstudio:latest
+    restart: unless-stopped
+    init: true
+    shm_size: 1gb # Chrome needs more than Docker's 64 MB default for renders
+    user: "${PUID:-1000}:${PGID:-1000}" # the VPS user that owns the repo folder
+    environment:
+      HOST: 127.0.0.1 # cloudflared shares this container's network, so localhost is enough
+      PORT: "4321"
+      NO_OPEN: "1"
+      PREVIEW_HOST: ${PREVIEW_HOST:?set PREVIEW_HOST in .env}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:?set COOKIE_DOMAIN in .env}
+      COOKIE_SECURE: "1"
+    volumes:
+      - .:/app # code, projects, renders, admins.json: all stay on the server's disk
+      - ./deploy/state/claude:/home/node/.claude # the Claude login (run `claude login` once)
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4321/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 180s # first start installs packages
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    network_mode: "service:studio"
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+    depends_on:
+      - studio

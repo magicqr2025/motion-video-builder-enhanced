@@ -25,6 +25,7 @@ import {mountDecks} from './decks.mjs';
 import {mountVoice} from './voice.mjs';
 import {mountAudioLibrary} from './audiolib.mjs';
 import {mountAuth} from './auth.mjs';
+import {previewHttp, previewUpgrade} from './previewproxy.mjs';
 import {ensureDarkCss} from './darkcss.mjs';
 import {convertAnimated, OUTPUT_FORMATS, ANIM_WIDTHS, ANIM_FPS} from './animate.mjs';
 import {getCatalog, cleanBorrow, cleanPicks} from './catalog.mjs';
@@ -32,7 +33,14 @@ import {LOOK_SPEC, cleanLook, bundleLevels, layerFile, builtLevels, lookChanges,
 
 const PORT = Number(process.env.PORT ?? 4321);
 const app = express();
+app.set('trust proxy', 'loopback'); // behind the Cloudflare Tunnel on a server, so the sign-in lock-out sees the visitor's IP
+const PREVIEW_HOST = process.env.PREVIEW_HOST ?? '';
+// where the browser loads the live preview from: its own hostname on a server, localhost:3100 on a PC
+const PREVIEW_URL = (process.env.PREVIEW_URL || (PREVIEW_HOST ? `https://${PREVIEW_HOST}` : `http://localhost:${STUDIO_PORT}`)).replace(/[/]$/, '');
 app.use(express.json({limit: '2mb'}));
+
+// Requests for the preview hostname are answered (after a sign-in check) before the studio's own routes.
+previewHttp(app, {host: PREVIEW_HOST, port: STUDIO_PORT});
 
 // Sign-in comes first: everything below needs a signed-in admin (see auth.mjs). /api/presence and /api/health are open so the
 // desktop launcher can tell whether a window is still open.
@@ -232,7 +240,7 @@ const processAssetNow = async (id, file) => {
 
 // ---------- state ----------
 app.get('/api/state', wrap(async (req, res) => {
-  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, renderJob, settings: publicSettings(), lookSpec: LOOK_SPEC, catalog: getCatalog()});
+  res.json({presets: listPresets(), brands: listBrands(), projects: listProjects().map((p) => ({id: p.id, title: p.title, status: p.status, presetId: p.presetId, updatedAt: p.updatedAt, busy: isBusy(p.id)})), studioPort: STUDIO_PORT, previewUrl: PREVIEW_URL, renderJob, settings: publicSettings(), lookSpec: LOOK_SPEC, catalog: getCatalog()});
 }));
 
 app.post('/api/projects', wrap(async (req, res) => {
@@ -1058,7 +1066,7 @@ app.use('/public', express.static(path.join(REEL, 'public'), {fallthrough: false
 app.use(express.static(WEB, {setHeaders: (res) => res.set('Cache-Control', 'no-cache')}));
 
 const URL_ = `http://localhost:${PORT}`;
-const openBrowser = () => { if (!process.argv.includes('--no-open')) exec(process.platform === 'win32' ? `start "" "${URL_}"` : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} ${URL_}`); };
+const openBrowser = () => { if (!process.argv.includes('--no-open') && !process.env.NO_OPEN) exec(process.platform === 'win32' ? `start "" "${URL_}"` : `${process.platform === 'darwin' ? 'open' : 'xdg-open'} ${URL_}`); };
 
 // If the studio stopped mid-run (PC out of memory, window closed), projects stay "concepting"/"building"/"rendering"
 // with a spinner forever. Called once this copy owns the port (so nothing is running), it puts them back to the
@@ -1127,6 +1135,7 @@ const server = app.listen(PORT, HOST, (err) => {
     });
   }, 5000);
 });
+previewUpgrade(server, {host: PREVIEW_HOST, port: STUDIO_PORT});
 // already running (e.g. started from another terminal or VS Code): just open the web view
 server.on('error', (e) => {
   if (e.code !== 'EADDRINUSE') throw e;

@@ -86,6 +86,6 @@ export const flushSave = async (onState) => {
 export const hasPending = () => Object.keys(PEND.patch).length > 0;
 
 // the live Remotion preview of the open video, and the card shown while a page's data file does not exist yet
-export const studioUrl = (c) => `http://localhost:${S.state.studioPort}/${c.compositions.video}`;
+export const studioUrl = (c) => `${S.state.previewUrl}/${c.compositions.video}`;
 export const previewBox = (c, h = 420) => `<div class="preview" style="height:${h}px;aspect-ratio:auto"><iframe src="${studioUrl(c)}" title="Remotion preview"></iframe></div>`;
 export const notEditable = (title, text, btn, act, busy) => `<div class="card empty"><div class="ico">${ICON.bolt}</div><h2>${esc(title)}</h2><p>${esc(text)}</p><button type="button" class="btn main" data-act="${act}" ${busy ? 'disabled' : ''}>${esc(btn)}</button></div>`;

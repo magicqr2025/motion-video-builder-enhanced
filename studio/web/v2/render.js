@@ -18,7 +18,7 @@ const renderRow = (r) => `<div class="rrow">
 
 export const render = async (host, c) => {
   const p = c.project, locked = !p.approval, running = !!job();
-  const url = `http://localhost:${S.state.studioPort}/${c.compositions.video}`;
+  const url = `${S.state.previewUrl}/${c.compositions.video}`;
   const fmt = (p.brief.outputFormat || 'mp4').toUpperCase();
   host.innerHTML = `
     ${locked ? `<div class="lock"><b>Rendering is locked until you approve the build.</b><div class="small" style="margin-top:3px">Check every scene on Build &amp; timing, send any corrections, then approve. You can still watch the live preview here.</div><a class="btn sm" style="margin-top:10px" href="#/p/${p.id}/build">Go to Build &amp; timing</a></div>` : ''}
